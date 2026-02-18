@@ -3,7 +3,7 @@ import { authAPI } from '@/lib/apiClient';
 import { initSocket, disconnectSocket } from '@/lib/socket';
 import type { User } from '@/types/api';
 
-export type UserRole = 'admin' | 'hr' | 'employee' | null;
+export type UserRole = 'admin' | 'hr' | 'employee' | 'client' | null;
 
 interface AuthContextType {
   isAuthenticated: boolean;

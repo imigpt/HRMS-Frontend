@@ -33,6 +33,7 @@ import {
   Bell,
   Info,
   ArrowRight,
+  UserCheck,
 } from 'lucide-react';
 import aseleaLogo from '@/assets/aselea-logo.png';
 
@@ -46,6 +47,7 @@ const adminNavItems: NavItem[] = [
   { title: 'Dashboard', href: '/admin', icon: LayoutDashboard },
   { title: 'HR Accounts', href: '/admin/hr-accounts', icon: Users },
   { title: 'Employees', href: '/admin/employees', icon: UserCircle },
+  { title: 'Clients', href: '/admin/clients', icon: UserCheck },
   { title: 'Attendance', href: '/admin/attendance', icon: Clock },
   { title: 'Edit Requests', href: '/admin/attendance-requests', icon: FileEdit },
   { title: 'Leaves', href: '/admin/leaves', icon: CalendarCheck },
@@ -60,6 +62,7 @@ const hrNavItems: NavItem[] = [
   { title: 'Dashboard', href: '/hr', icon: LayoutDashboard },
   { title: 'My Profile', href: '/hr/profile', icon: User },
   { title: 'Employees', href: '/hr/employees', icon: UserCircle },
+  { title: 'Clients', href: '/hr/clients', icon: UserCheck },
   { title: 'My Attendance', href: '/hr/my-attendance', icon: Clock },
   { title: 'Attendance', href: '/hr/attendance', icon: Clock },
   { title: 'Edit Requests', href: '/hr/attendance-requests', icon: FileEdit },
@@ -81,6 +84,11 @@ const employeeNavItems: NavItem[] = [
   { title: 'Announcements', href: '/employee/announcements', icon: Megaphone },
 ];
 
+const clientNavItems: NavItem[] = [
+  { title: 'Dashboard', href: '/client', icon: LayoutDashboard },
+  { title: 'Chat', href: '/client/chat', icon: MessageSquare },
+];
+
 const getNavItems = (role: UserRole): NavItem[] => {
   switch (role) {
     case 'admin':
@@ -89,6 +97,8 @@ const getNavItems = (role: UserRole): NavItem[] => {
       return hrNavItems;
     case 'employee':
       return employeeNavItems;
+    case 'client':
+      return clientNavItems;
     default:
       return [];
   }
@@ -102,6 +112,8 @@ const getRoleLabel = (role: UserRole): string => {
       return 'HR Manager';
     case 'employee':
       return 'Employee';
+    case 'client':
+      return 'Client';
     default:
       return '';
   }
@@ -324,6 +336,8 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                               ? '/admin/announcements' 
                               : userRole === 'hr' 
                               ? '/hr/announcements' 
+                              : userRole === 'client'
+                              ? '/client'
                               : '/employee/announcements'
                           );
                         }}
@@ -357,6 +371,8 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                           ? '/admin/announcements' 
                           : userRole === 'hr' 
                           ? '/hr/announcements' 
+                          : userRole === 'client'
+                          ? '/client'
                           : '/employee/announcements'
                       );
                     }}

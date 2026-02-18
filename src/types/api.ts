@@ -4,12 +4,14 @@ export interface User {
   _id: string;
   name: string;
   email: string;
-  role: 'admin' | 'hr' | 'employee';
+  role: 'admin' | 'hr' | 'employee' | 'client';
   company?: Company | string;
   department?: string;
   position?: string;
   phone?: string;
   avatar?: string;
+  companyName?: string; // For clients - their external company name
+  clientNotes?: string; // Notes about the client
   status?: 'active' | 'inactive';
   createdAt?: string;
   updatedAt?: string;

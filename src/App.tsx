@@ -14,19 +14,16 @@ import AdminHRAccounts from "./pages/admin/AdminHRAccounts";
 import AdminEmployees from "./pages/admin/AdminEmployees";
 import AdminLeaves from "./pages/admin/AdminLeaves";
 import AdminTasks from "./pages/admin/AdminTasks";
-import HRDetail from "./pages/admin/HRDetail";
-import HRDashboard from "./pages/hr/HRDashboard";
+import HRDetail from "./pages/admin/HRDetail";import AdminClients from './pages/admin/AdminClients';import HRDashboard from "./pages/hr/HRDashboard";
 import HREmployees from "./pages/hr/HREmployees";
 import HRProfile from "./pages/hr/HRProfile";
 import HRTasks from "./pages/hr/HRTasks";
 import HRAttendanceRequests from "./pages/hr/HRAttendanceRequests";
-import HRAttendance from "./pages/hr/HRAttendance";
-import EmployeeDetail from "./pages/hr/EmployeeDetail";
+import HRAttendance from "./pages/hr/HRAttendance";import HRClients from './pages/hr/HRClients';import EmployeeDetail from "./pages/hr/EmployeeDetail";
 import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
 import EmployeeProfile from "./pages/employee/EmployeeProfile";
 import EmployeeAttendance from "./pages/employee/EmployeeAttendance";
-import EmployeeTasks from "./pages/employee/EmployeeTasks";
-
+import EmployeeTasks from "./pages/employee/EmployeeTasks";import ClientDashboard from './pages/client/ClientDashboard';
 // Modules
 import ChatModule from "./components/modules/ChatModule";
 import AttendanceModule from "./components/modules/AttendanceModule";
@@ -59,6 +56,7 @@ const App = () => (
             <Route path="/admin/employees/:employeeId" element={<ProtectedRoute allowedRole="admin"><EmployeeDetail /></ProtectedRoute>} />
             <Route path="/admin/leaves" element={<ProtectedRoute allowedRole="admin"><AdminLeaves /></ProtectedRoute>} />
             <Route path="/admin/tasks" element={<ProtectedRoute allowedRole="admin"><AdminTasks /></ProtectedRoute>} />
+            <Route path="/admin/clients" element={<ProtectedRoute allowedRole="admin"><AdminClients /></ProtectedRoute>} />
             <Route path="/admin/chat" element={<ProtectedRoute allowedRole="admin"><ChatModule role="admin" /></ProtectedRoute>} />
             <Route path="/admin/attendance" element={<ProtectedRoute allowedRole="admin"><AttendanceModule role="admin" /></ProtectedRoute>} />
             <Route path="/admin/attendance-requests" element={<ProtectedRoute allowedRole="admin"><HRAttendanceRequests /></ProtectedRoute>} />
@@ -77,6 +75,7 @@ const App = () => (
             <Route path="/hr/attendance-requests" element={<ProtectedRoute allowedRole="hr"><HRAttendanceRequests /></ProtectedRoute>} />
             <Route path="/hr/leaves" element={<ProtectedRoute allowedRole="hr"><LeaveModule role="hr" /></ProtectedRoute>} />
             <Route path="/hr/tasks" element={<ProtectedRoute allowedRole="hr"><HRTasks /></ProtectedRoute>} />
+            <Route path="/hr/clients" element={<ProtectedRoute allowedRole="hr"><HRClients /></ProtectedRoute>} />
             <Route path="/hr/expenses" element={<ProtectedRoute allowedRole="hr"><ExpensesModule role="hr" /></ProtectedRoute>} />
             <Route path="/hr/announcements" element={<ProtectedRoute allowedRole="hr"><AnnouncementsModule role="hr" /></ProtectedRoute>} />
             <Route path="/hr/*" element={<ProtectedRoute allowedRole="hr"><HRDashboard /></ProtectedRoute>} />
@@ -92,6 +91,11 @@ const App = () => (
             <Route path="/employee/expenses" element={<ProtectedRoute allowedRole="employee"><ExpensesModule role="employee" /></ProtectedRoute>} />
             <Route path="/employee/announcements" element={<ProtectedRoute allowedRole="employee"><AnnouncementsModule role="employee" /></ProtectedRoute>} />
             <Route path="/employee/*" element={<ProtectedRoute allowedRole="employee"><EmployeeDashboard /></ProtectedRoute>} />
+
+            {/* Client Routes - Protected */}
+            <Route path="/client" element={<ProtectedRoute allowedRole="client"><ClientDashboard /></ProtectedRoute>} />
+            <Route path="/client/chat" element={<ProtectedRoute allowedRole="client"><ChatModule role="client" /></ProtectedRoute>} />
+            <Route path="/client/*" element={<ProtectedRoute allowedRole="client"><ClientDashboard /></ProtectedRoute>} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/login" replace />} />
