@@ -57,7 +57,7 @@ import { getSocket, initSocket } from '@/lib/socket';
 import type { ChatRoom, Message, User, OnlineUser, TypingUser } from '@/types/api';
 
 interface ChatModuleProps {
-  role: 'admin' | 'hr' | 'employee';
+  role: 'admin' | 'hr' | 'employee' | 'client';
 }
 
 const ChatModule = ({ role }: ChatModuleProps) => {
@@ -774,7 +774,11 @@ const ChatModule = ({ role }: ChatModuleProps) => {
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>Start New Chat</DialogTitle>
-                      <DialogDescription>Select a colleague to start a conversation</DialogDescription>
+                      <DialogDescription>
+                        {role === 'client'
+                          ? 'Select an Admin or HR to start a conversation'
+                          : 'Select a colleague to start a conversation'}
+                      </DialogDescription>
                     </DialogHeader>
                     <ScrollArea className="h-[300px] pr-4">
                       <div className="space-y-2">
@@ -792,7 +796,9 @@ const ChatModule = ({ role }: ChatModuleProps) => {
                             </Avatar>
                             <div className="flex-1">
                               <p className="font-medium">{u.name}</p>
-                              <p className="text-xs text-muted-foreground">{u.position || u.role}</p>
+                              <p className="text-xs text-muted-foreground capitalize">
+                                {u.role === 'client' ? `Client${u.companyName ? ` · ${u.companyName}` : ''}` : (u.position || u.role)}
+                              </p>
                             </div>
                             {isUserOnline(u._id) && (
                               <span className="w-2 h-2 bg-green-500 rounded-full" />
@@ -854,7 +860,15 @@ const ChatModule = ({ role }: ChatModuleProps) => {
                                     {getInitials(u.name)}
                                   </AvatarFallback>
                                 </Avatar>
-                                <span className="text-sm">{u.name}</span>
+                                <div className="flex-1">
+                                  <span className="text-sm">{u.name}</span>
+                                  {u.role === 'client' && (
+                                    <Badge variant="outline" className="ml-2 text-xs py-0 px-1 border-orange-400 text-orange-500">
+                                      Client
+                                    </Badge>
+                                  )}
+                                  <p className="text-xs text-muted-foreground capitalize">{u.position || u.role}</p>
+                                </div>
                               </div>
                             ))}
                           </ScrollArea>

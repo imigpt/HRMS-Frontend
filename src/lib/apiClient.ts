@@ -213,6 +213,30 @@ export const chatAPI = {
   markAsRead: (userId: string) => api.put(`/chat/read/${userId}`),
 };
 
+// Client APIs (Admin/HR manage clients)
+export const clientAPI = {
+  getClients: (params?: any) => api.get('/clients', { params }),
+  createClient: (data: any) => {
+    // Use FormData if profilePhoto is included
+    if (data.profilePhoto instanceof File) {
+      const formData = new FormData();
+      Object.entries(data).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          formData.append(key, value as any);
+        }
+      });
+      return api.post('/clients', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    }
+    return api.post('/clients', data);
+  },
+  getClientById: (id: string) => api.get(`/clients/${id}`),
+  updateClient: (id: string, data: any) => api.put(`/clients/${id}`, data),
+  deleteClient: (id: string) => api.delete(`/clients/${id}`),
+  getDashboard: () => api.get('/clients/dashboard'),
+};
+
 // Company APIs
 export const companyAPI = {
   getCompanies: (params?: any) => api.get('/companies', { params }),
