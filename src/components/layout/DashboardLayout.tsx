@@ -51,6 +51,7 @@ const adminNavItems: NavItem[] = [
   { title: 'Attendance', href: '/admin/attendance', icon: Clock },
   { title: 'Edit Requests', href: '/admin/attendance-requests', icon: FileEdit },
   { title: 'Leaves', href: '/admin/leaves', icon: CalendarCheck },
+  { title: 'Leave Management', href: '/admin/leave-management', icon: CalendarDays },
   { title: 'Tasks', href: '/admin/tasks', icon: ClipboardList },
   { title: 'Expenses', href: '/admin/expenses', icon: Receipt },
   { title: 'Chat', href: '/admin/chat', icon: MessageSquare },

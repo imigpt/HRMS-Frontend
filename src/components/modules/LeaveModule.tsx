@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useApi } from '@/hooks/useApi';
-import { leaveAPI, employeeAPI } from '@/lib/apiClient';
+import { leaveAPI, employeeAPI, leaveBalanceAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
 
 interface LeaveRequest {
@@ -85,7 +85,7 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
 
   useEffect(() => {
     fetchLeaves();
-    if (role === 'employee') {
+    if (role === 'employee' || role === 'hr') {
       fetchLeaveBalance();
     }
   }, [role]);
@@ -107,15 +107,30 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
 
   const fetchLeaveBalance = async () => {
     try {
-      const result = await execute(() => employeeAPI.getLeaveBalance());
-      if (result?.data) {
-        // Transform the object into an array format
-        const balanceArray = Object.entries(result.data).map(([type, value]) => ({
-          leaveType: type.charAt(0).toUpperCase() + type.slice(1), // Capitalize first letter
-          total: value as number,
-          used: 0, // Backend doesn't track used, only remaining
-          remaining: value as number,
-        }));
+      const result = await execute(() => leaveBalanceAPI.getMyBalance());
+      if (result?.data?.data) {
+        // Transform backend balance object into array format
+        const balance = result.data.data;
+        const balanceArray = [
+          {
+            leaveType: 'Paid',
+            total: balance.paid || 0,
+            used: balance.usedPaid || 0,
+            remaining: (balance.paid - balance.usedPaid) || 0,
+          },
+          {
+            leaveType: 'Sick',
+            total: balance.sick || 0,
+            used: balance.usedSick || 0,
+            remaining: (balance.sick - balance.usedSick) || 0,
+          },
+          {
+            leaveType: 'Unpaid',
+            total: balance.unpaid || 0,
+            used: balance.usedUnpaid || 0,
+            remaining: (balance.unpaid - balance.usedUnpaid) || 0,
+          },
+        ];
         setLeaveBalance(balanceArray);
       }
     } catch (error: any) {
@@ -212,8 +227,8 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
   return (
     <DashboardLayout>
       <div className="space-y-6 fade-in">
-        {/* Leave Balance Cards (for employees) */}
-        {role === 'employee' && (
+        {/* Leave Balance Cards (for employees and HR) */}
+        {(role === 'employee' || role === 'hr') && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {leaveBalance.map((leave) => (
               <Card key={leave.leaveType} className="glass-card card-hover">
@@ -332,11 +347,8 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
                               <SelectValue placeholder="Select type" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="casual">Casual Leave</SelectItem>
+                              <SelectItem value="paid">Paid Leave</SelectItem>
                               <SelectItem value="sick">Sick Leave</SelectItem>
-                              <SelectItem value="annual">Annual Leave</SelectItem>
-                              <SelectItem value="maternity">Maternity Leave</SelectItem>
-                              <SelectItem value="paternity">Paternity Leave</SelectItem>
                               <SelectItem value="unpaid">Unpaid Leave</SelectItem>
                             </SelectContent>
                           </Select>

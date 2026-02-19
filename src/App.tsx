@@ -14,6 +14,7 @@ import AdminHRAccounts from "./pages/admin/AdminHRAccounts";
 import AdminEmployees from "./pages/admin/AdminEmployees";
 import AdminLeaves from "./pages/admin/AdminLeaves";
 import AdminTasks from "./pages/admin/AdminTasks";
+import AdminLeaveManagement from "./pages/admin/AdminLeaveManagement";
 import HRDetail from "./pages/admin/HRDetail";import AdminClients from './pages/admin/AdminClients';import HRDashboard from "./pages/hr/HRDashboard";
 import HREmployees from "./pages/hr/HREmployees";
 import HRProfile from "./pages/hr/HRProfile";
@@ -55,6 +56,7 @@ const App = () => (
             <Route path="/admin/employees" element={<ProtectedRoute allowedRole="admin"><AdminEmployees /></ProtectedRoute>} />
             <Route path="/admin/employees/:employeeId" element={<ProtectedRoute allowedRole="admin"><EmployeeDetail /></ProtectedRoute>} />
             <Route path="/admin/leaves" element={<ProtectedRoute allowedRole="admin"><AdminLeaves /></ProtectedRoute>} />
+            <Route path="/admin/leave-management" element={<ProtectedRoute allowedRole="admin"><AdminLeaveManagement /></ProtectedRoute>} />
             <Route path="/admin/tasks" element={<ProtectedRoute allowedRole="admin"><AdminTasks /></ProtectedRoute>} />
             <Route path="/admin/clients" element={<ProtectedRoute allowedRole="admin"><AdminClients /></ProtectedRoute>} />
             <Route path="/admin/chat" element={<ProtectedRoute allowedRole="admin"><ChatModule role="admin" /></ProtectedRoute>} />

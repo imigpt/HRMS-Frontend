@@ -81,6 +81,17 @@ export const leaveAPI = {
   getStatistics: (params?: any) => api.get('/leaves/statistics', { params }),
 };
 
+// Leave Balance APIs
+export const leaveBalanceAPI = {
+  getAll: () => api.get('/leave-balance'),
+  getByUser: (userId: string) => api.get(`/leave-balance/${userId}`),
+  getMyBalance: () => api.get('/leave-balance/me'),
+  assign: (userId: string, data: { paid: number; sick: number; unpaid: number }) =>
+    api.put(`/leave-balance/${userId}`, data),
+  bulkAssign: (data: { paid: number; sick: number; unpaid: number }) =>
+    api.post('/leave-balance/bulk', data),
+};
+
 // Attendance APIs
 export const attendanceAPI = {
   // Check in with optional photo (FormData for photo upload)
@@ -275,6 +286,7 @@ export default {
   hr: hrAPI,
   employee: employeeAPI,
   leave: leaveAPI,
+  leaveBalance: leaveBalanceAPI,
   attendance: attendanceAPI,
   task: taskAPI,
   expense: expenseAPI,
