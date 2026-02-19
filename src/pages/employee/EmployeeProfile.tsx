@@ -40,8 +40,12 @@ const EmployeeProfile = () => {
     employeeId: '',
     department: '',
     position: '',
-    profilePhoto: '' as {url: string; publicId: string} | string,
+    bio: '',
+    profilePhoto: '',
     status: 'active',
+    reportingTo: '',
+    emergencyContactName: '',
+    emergencyContact: '',
   });
 
   useEffect(() => {
@@ -63,8 +67,12 @@ const EmployeeProfile = () => {
         employeeId: data.employeeId || '',
         department: data.department || '',
         position: data.position || '',
-        profilePhoto: (typeof data.profilePhoto === 'string' ? data.profilePhoto : data.profilePhoto?.url) || '',
+        bio: data.bio || '',
+          profilePhoto: (typeof data.profilePhoto === 'string' ? data.profilePhoto : data.profilePhoto?.url) || '',
         status: data.status || 'active',
+        reportingTo: data.reportingTo || '',
+        emergencyContactName: data.emergencyContactName || '',
+        emergencyContact: data.emergencyContact || '',
       });
     } catch (error: any) {
       console.error('Failed to fetch profile:', error);
@@ -101,9 +109,13 @@ const EmployeeProfile = () => {
   const handleSave = async () => {
     try {
       const formData = new FormData();
-      Object.keys(profileData).forEach(key => {
-        if (profileData[key as keyof typeof profileData]) {
-          formData.append(key, profileData[key as keyof typeof profileData]);
+      Object.entries(profileData).forEach(([key, val]) => {
+        // Skip profilePhoto (we upload file separately) and empty values
+        if (key === 'profilePhoto' || val === undefined || val === null || val === '') return;
+        if (typeof val === 'object') {
+          formData.append(key, JSON.stringify(val));
+        } else {
+          formData.append(key, String(val));
         }
       });
       
@@ -161,7 +173,7 @@ const EmployeeProfile = () => {
               <div className="relative">
                 <Avatar className="h-32 w-32 border-4 border-primary/20">
                   {photoPreview || profileData.profilePhoto ? (
-                    <AvatarImage src={photoPreview || profileData.profilePhoto} alt={profileData.name} />
+                    <AvatarImage src={String(photoPreview || profileData.profilePhoto)} alt={profileData.name} />
                   ) : (
                     <AvatarFallback className="bg-primary/20 text-primary text-3xl">
                       {profileData.name.split(' ').map((n: string) => n[0]).join('')}
@@ -328,16 +340,27 @@ const EmployeeProfile = () => {
 
               <div className="space-y-2">
                 <Label className="text-muted-foreground">Date of Birth</Label>
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-foreground">
-                    {new Date(profileData.dateOfBirth).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}
-                  </p>
-                </div>
+                {isEditing ? (
+                  <Input
+                    type="date"
+                    value={profileData.dateOfBirth ? new Date(profileData.dateOfBirth).toISOString().slice(0, 10) : ''}
+                    onChange={(e) => handleChange('dateOfBirth', e.target.value)}
+                    className="bg-secondary border-border"
+                  />
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-foreground">
+                      {profileData.dateOfBirth
+                        ? new Date(profileData.dateOfBirth).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })
+                        : 'N/A'}
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
