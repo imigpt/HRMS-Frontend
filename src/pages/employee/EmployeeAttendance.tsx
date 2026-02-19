@@ -43,7 +43,7 @@ interface TodayAttendance {
     time?: string;
     location?: { latitude: number; longitude: number; address?: string };
   };
-  status: 'present' | 'absent' | 'late' | 'on-leave';
+  status: 'present' | 'absent' | 'late' | 'on-leave' | 'half-day';
   workHours?: number;
 }
 
@@ -82,6 +82,11 @@ const EmployeeAttendance = () => {
     reason: '',
   });
   const [submittingEdit, setSubmittingEdit] = useState(false);
+
+  // Half-day request state
+  const [isHalfDayDialogOpen, setIsHalfDayDialogOpen] = useState(false);
+  const [halfDayFormData, setHalfDayFormData] = useState({ date: '', reason: '' });
+  const [submittingHalfDay, setSubmittingHalfDay] = useState(false);
   
   // Camera state
   const [showCamera, setShowCamera] = useState(false);
@@ -111,7 +116,28 @@ const EmployeeAttendance = () => {
   const fetchTodayAttendance = async () => {
     try {
       const response = await attendanceAPI.getToday();
-      setTodayAttendance(response.data.data);
+      const todayRec = response.data.data;
+      setTodayAttendance(todayRec);
+
+      // Merge into monthAttendance so the calendar shows today's status immediately
+      if (todayRec && todayRec.date) {
+        const recDate = new Date(todayRec.date);
+        if (recDate.getFullYear() === selectedYear && recDate.getMonth() === selectedMonth) {
+          setMonthAttendance(prev => {
+            // Replace existing record for today or prepend if not present
+            const filtered = prev.filter(r => {
+              if (!r || !r.date) return true;
+              const d = new Date(r.date);
+              return !(
+                d.getFullYear() === recDate.getFullYear() &&
+                d.getMonth() === recDate.getMonth() &&
+                d.getDate() === recDate.getDate()
+              );
+            });
+            return [todayRec, ...filtered];
+          });
+        }
+      }
     } catch (error: any) {
       console.error('Failed to fetch today attendance:', error);
       // If no attendance for today, that's okay - user hasn't checked in yet
@@ -128,8 +154,9 @@ const EmployeeAttendance = () => {
   const fetchMonthAttendance = async () => {
     try {
       setLoading(true);
-      const startDate = new Date(selectedYear, selectedMonth, 1).toISOString();
-      const endDate = new Date(selectedYear, selectedMonth + 1, 0).toISOString();
+      const startDate = new Date(selectedYear, selectedMonth, 1, 0, 0, 0, 0).toISOString();
+      // End of the last day of the month (23:59:59.999) so today's records are included
+      const endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59, 999).toISOString();
       
       const response = await attendanceAPI.getMyAttendance({ 
         startDate,
@@ -286,9 +313,10 @@ const EmployeeAttendance = () => {
       // Reset camera state
       setCapturedPhoto(null);
       setCapturedPhotoFile(null);
-      
-      await fetchTodayAttendance();
+
+      // Fetch month first so full list is loaded, then merge today's record on top
       await fetchMonthAttendance();
+      await fetchTodayAttendance();
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -316,8 +344,9 @@ const EmployeeAttendance = () => {
         title: 'Success',
         description: 'Checked out successfully!',
       });
-      await fetchTodayAttendance();
+      // Fetch month first so full list is loaded, then merge today's record on top
       await fetchMonthAttendance();
+      await fetchTodayAttendance();
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -335,6 +364,7 @@ const EmployeeAttendance = () => {
     late: monthAttendance.filter(d => d.status === 'late').length,
     absent: monthAttendance.filter(d => d.status === 'absent').length,
     leave: monthAttendance.filter(d => d.status === 'on-leave').length,
+    halfday: monthAttendance.filter(d => d.status === 'half-day').length,
   };
   
   const months = [
@@ -379,10 +409,14 @@ const EmployeeAttendance = () => {
     
     // Add actual days with attendance records matched by date
     for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = new Date(selectedYear, selectedMonth, day).toISOString().split('T')[0];
       const attendanceRecord = monthAttendance.find(record => {
-        const recordDate = new Date(record.date).toISOString().split('T')[0];
-        return recordDate === dateStr;
+        if (!record || !record.date) return false;
+        const recordDate = new Date(record.date);
+        return (
+          recordDate.getFullYear() === selectedYear &&
+          recordDate.getMonth() === selectedMonth &&
+          recordDate.getDate() === day
+        );
       });
       days.push({ day, attendance: attendanceRecord || null });
     }
@@ -400,6 +434,8 @@ const EmployeeAttendance = () => {
         return 'bg-destructive/20 border-destructive/40 text-destructive';
       case 'on-leave':
         return 'bg-primary/20 border-primary/40 text-primary';
+      case 'half-day':
+        return 'bg-orange-500/20 border-orange-500/40 text-orange-400';
       default:
         return 'bg-muted border-border text-muted-foreground';
     }
@@ -415,6 +451,8 @@ const EmployeeAttendance = () => {
         return <Badge className="status-rejected">Absent</Badge>;
       case 'on-leave':
         return <Badge className="status-in-progress">Leave</Badge>;
+      case 'half-day':
+        return <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/40">Half Day</Badge>;
       default:
         return <Badge variant="outline">-</Badge>;
     }
@@ -500,6 +538,52 @@ const EmployeeAttendance = () => {
     }
   };
   
+  const handleSubmitHalfDayRequest = async () => {
+    if (!halfDayFormData.date || !halfDayFormData.reason) {
+      toast({
+        title: 'Error',
+        description: 'Please fill in both date and reason',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (halfDayFormData.reason.length < 10) {
+      toast({
+        title: 'Error',
+        description: 'Reason must be at least 10 characters',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setSubmittingHalfDay(true);
+      await attendanceAPI.requestHalfDay({
+        date: halfDayFormData.date,
+        reason: halfDayFormData.reason,
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Half day request submitted! HR will review your request.',
+      });
+
+      setIsHalfDayDialogOpen(false);
+      setHalfDayFormData({ date: '', reason: '' });
+      await fetchMonthAttendance();
+      await fetchTodayAttendance();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.message || 'Failed to submit half day request',
+        variant: 'destructive',
+      });
+    } finally {
+      setSubmittingHalfDay(false);
+    }
+  };
+
   // Helper variables for checked in/out status
   const hasCheckedIn = !!todayAttendance?.checkIn?.time;
   const hasCheckedOut = !!todayAttendance?.checkOut?.time;
@@ -519,6 +603,37 @@ const EmployeeAttendance = () => {
     const hours = Math.floor(workHours);
     const minutes = Math.round((workHours - hours) * 60);
     return `${hours}h ${minutes}m`;
+  };
+
+  const downloadAttendanceCSV = () => {
+    if (!monthAttendance || monthAttendance.length === 0) {
+      toast({ title: 'No records', description: 'No attendance records to export' });
+      return;
+    }
+
+    const rows: Array<string[]> = [];
+    rows.push(['Date', 'Check In', 'Check Out', 'Status', 'Work Hours', 'Check-in Photo']);
+
+    monthAttendance.forEach((rec) => {
+      const date = rec.date ? new Date(rec.date).toLocaleDateString() : '';
+      const checkIn = rec.checkIn?.time ? new Date(rec.checkIn.time).toLocaleTimeString() : '';
+      const checkOut = rec.checkOut?.time ? new Date(rec.checkOut.time).toLocaleTimeString() : '';
+      const status = rec.status || '';
+      const workHours = rec.workHours ? formatDuration(rec.workHours) : '';
+      const photo = rec.checkIn?.photo?.url || '';
+      rows.push([date, checkIn, checkOut, status, workHours, photo]);
+    });
+
+    const csv = rows.map(r => r.map(c => `"${String(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `attendance-${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   };
   
   return (
@@ -671,13 +786,17 @@ const EmployeeAttendance = () => {
                   <FileText className="h-4 w-4 mr-2" />
                   Apply Leave
                 </Button>
+                <Button variant="outline" size="lg" className="glass-card border-orange-500/40 text-orange-400 hover:bg-orange-500/10" onClick={() => setIsHalfDayDialogOpen(true)}>
+                  <Clock className="h-4 w-4 mr-2" />
+                  Apply Half Day
+                </Button>
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Stats Overview */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card className="glass-card card-hover">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
@@ -726,6 +845,19 @@ const EmployeeAttendance = () => {
                 <div>
                   <p className="text-2xl font-bold text-foreground">{stats.leave}</p>
                   <p className="text-xs text-muted-foreground">Leave</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="glass-card card-hover">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center">
+                  <Clock className="h-5 w-5 text-orange-400" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-foreground">{stats.halfday}</p>
+                  <p className="text-xs text-muted-foreground">Half Day</p>
                 </div>
               </div>
             </CardContent>
@@ -782,6 +914,10 @@ const EmployeeAttendance = () => {
                 <Button variant="secondary" size="sm" onClick={handleToday}>
                   Today
                 </Button>
+                <Button variant="outline" size="sm" onClick={() => downloadAttendanceCSV()}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Export
+                </Button>
               </div>
             </div>
           </CardHeader>
@@ -825,6 +961,7 @@ const EmployeeAttendance = () => {
                           {attendance.status === 'late' && <AlertCircle className="h-2.5 w-2.5" />}
                           {attendance.status === 'absent' && <XCircle className="h-2.5 w-2.5" />}
                           {attendance.status === 'on-leave' && <CircleDot className="h-2.5 w-2.5" />}
+                          {attendance.status === 'half-day' && <CheckCircle className="h-2.5 w-2.5" />}
                         </div>
                       )}
                     </div>
@@ -1037,6 +1174,60 @@ const EmployeeAttendance = () => {
                 disabled={submittingEdit || !editFormData.reason || editFormData.reason.length < 10 || !editFormData.punchIn || !editFormData.punchOut}
               >
                 {submittingEdit && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                <Send className="h-4 w-4 mr-2" />
+                Submit Request
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Half Day Request Dialog */}
+        <Dialog open={isHalfDayDialogOpen} onOpenChange={setIsHalfDayDialogOpen}>
+          <DialogContent className="glass-card max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-orange-400" />
+                Apply Half Day
+              </DialogTitle>
+              <DialogDescription>
+                Submit a half day request. HR will review and approve your request.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="halfDayDate">Date <span className="text-destructive">*</span></Label>
+                <Input
+                  id="halfDayDate"
+                  type="date"
+                  className="bg-secondary border-border"
+                  value={halfDayFormData.date}
+                  onChange={(e) => setHalfDayFormData({ ...halfDayFormData, date: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="halfDayReason">Reason <span className="text-destructive">*</span></Label>
+                <Textarea
+                  id="halfDayReason"
+                  placeholder="Explain why you need a half day (minimum 10 characters)"
+                  className="bg-secondary border-border min-h-[100px]"
+                  value={halfDayFormData.reason}
+                  onChange={(e) => setHalfDayFormData({ ...halfDayFormData, reason: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {halfDayFormData.reason.length}/10 characters minimum
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setIsHalfDayDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                className="bg-orange-500 hover:bg-orange-600 text-white"
+                onClick={handleSubmitHalfDayRequest}
+                disabled={submittingHalfDay || !halfDayFormData.date || !halfDayFormData.reason || halfDayFormData.reason.length < 10}
+              >
+                {submittingHalfDay && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 <Send className="h-4 w-4 mr-2" />
                 Submit Request
               </Button>

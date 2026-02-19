@@ -22,6 +22,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { employeeAPI } from '@/lib/apiClient';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
 const EmployeeProfile = () => {
@@ -148,6 +149,8 @@ const EmployeeProfile = () => {
   const handleChange = (field: string, value: string) => {
     setProfileData({ ...profileData, [field]: value });
   };
+
+  const { userRole } = useAuth();
 
   if (loading) {
     return (
@@ -284,7 +287,7 @@ const EmployeeProfile = () => {
 
               <div className="space-y-2">
                 <Label className="text-muted-foreground">Email Address</Label>
-                {isEditing ? (
+                {isEditing && userRole !== 'employee' ? (
                   <Input
                     value={profileData.email}
                     onChange={(e) => handleChange('email', e.target.value)}
@@ -296,6 +299,9 @@ const EmployeeProfile = () => {
                     <Mail className="h-4 w-4 text-muted-foreground" />
                     <p className="text-foreground">{profileData.email}</p>
                   </div>
+                )}
+                {isEditing && userRole === 'employee' && (
+                  <p className="text-xs text-muted-foreground">Email cannot be edited. Contact HR to change.</p>
                 )}
               </div>
 

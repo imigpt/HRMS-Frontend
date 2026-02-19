@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
-import { announcementAPI } from '@/lib/apiClient';
+import { useNotifications } from '@/contexts/NotificationContext';
 import {
   LayoutDashboard,
   Building2,
@@ -34,6 +34,9 @@ import {
   Info,
   ArrowRight,
   UserCheck,
+  CheckCircle,
+  XCircle,
+  CheckCheck,
 } from 'lucide-react';
 import aseleaLogo from '@/assets/aselea-logo.png';
 
@@ -51,10 +54,12 @@ const adminNavItems: NavItem[] = [
   { title: 'Attendance', href: '/admin/attendance', icon: Clock },
   { title: 'Edit Requests', href: '/admin/attendance-requests', icon: FileEdit },
   { title: 'Leaves', href: '/admin/leaves', icon: CalendarCheck },
+  { title: 'Leave Management', href: '/admin/leave-management', icon: CalendarCheck },
   { title: 'Tasks', href: '/admin/tasks', icon: ClipboardList },
   { title: 'Expenses', href: '/admin/expenses', icon: Receipt },
   { title: 'Chat', href: '/admin/chat', icon: MessageSquare },
   { title: 'Announcements', href: '/admin/announcements', icon: Megaphone },
+  { title: 'Company Policies', href: '/admin/policies', icon: FileText },
   { title: 'System Overview', href: '/admin/system', icon: Settings },
 ];
 
@@ -71,6 +76,7 @@ const hrNavItems: NavItem[] = [
   { title: 'Expenses', href: '/hr/expenses', icon: Receipt },
   { title: 'Chat', href: '/hr/chat', icon: MessageSquare },
   { title: 'Announcements', href: '/hr/announcements', icon: Megaphone },
+  { title: 'Company Policies', href: '/hr/policies', icon: FileText },
   { title: 'Holidays', href: '/hr/holidays', icon: CalendarDays },
 ];
 
@@ -82,6 +88,7 @@ const employeeNavItems: NavItem[] = [
   { title: 'Expenses', href: '/employee/expenses', icon: Receipt },
   { title: 'Chat', href: '/employee/chat', icon: MessageSquare },
   { title: 'Announcements', href: '/employee/announcements', icon: Megaphone },
+  { title: 'Company Policies', href: '/employee/policies', icon: FileText },
 ];
 
 const clientNavItems: NavItem[] = [
@@ -130,50 +137,44 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
-  const [recentAnnouncements, setRecentAnnouncements] = useState<any[]>([]);
 
-  const navItems = getNavItems(userRole);
-
-  // Fetch recent announcements
-  useEffect(() => {
-    const fetchAnnouncements = async () => {
-      try {
-        const response = await announcementAPI.getAnnouncements({ limit: 3 });
-        if (response.data?.data) {
-          setRecentAnnouncements(response.data.data.slice(0, 3));
-        }
-      } catch (error) {
-        console.error('Failed to fetch announcements:', error);
-      }
-    };
-    fetchAnnouncements();
-  }, []);
+  // Use the aggregated notification system
+  const { notifications, unreadCount, markAsRead, markAllRead } = useNotifications();
+  const previewNotifications = notifications.slice(0, 6);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  const getPriorityIcon = (priority: string) => {
-    switch (priority) {
-      case 'high':
-        return <AlertTriangle className="h-4 w-4 text-destructive" />;
-      case 'medium':
-        return <Bell className="h-4 w-4 text-warning" />;
-      default:
-        return <Info className="h-4 w-4 text-primary" />;
+  const navItems = getNavItems(userRole);
+
+  const getNotifIcon = (type: string) => {
+    if (type.includes('approved')) return <CheckCircle className="h-4 w-4 text-success" />;
+    if (type.includes('rejected')) return <XCircle className="h-4 w-4 text-destructive" />;
+    if (type === 'chat') return <MessageSquare className="h-4 w-4 text-blue-400" />;
+    if (type === 'announcement') return <Megaphone className="h-4 w-4 text-primary" />;
+    if (type.includes('pending')) return <AlertTriangle className="h-4 w-4 text-warning" />;
+    return <Bell className="h-4 w-4 text-muted-foreground" />;
+  };
+
+  const getNotifLink = () => {
+    switch (userRole) {
+      case 'admin': return '/admin/notifications';
+      case 'hr': return '/hr/notifications';
+      case 'client': return '/client/notifications';
+      default: return '/employee/notifications';
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high':
-        return 'text-destructive';
-      case 'medium':
-        return 'text-warning';
-      default:
-        return 'text-primary';
-    }
+  const formatTimeAgo = (isoString: string) => {
+    const diff = Date.now() - new Date(isoString).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
   };
 
   const NavContent = () => (
@@ -307,77 +308,100 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
             <Popover open={notificationOpen} onOpenChange={setNotificationOpen}>
               <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative">
-                  <Megaphone className="h-5 w-5" />
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-primary-foreground text-[10px] rounded-full flex items-center justify-center">
-                    {recentAnnouncements.length}
-                  </span>
+                  <Bell className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-primary-foreground text-[10px] rounded-full flex items-center justify-center font-bold">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-80 p-0 glass-card" align="end">
-                <div className="p-4 border-b border-border">
-                  <h3 className="font-semibold text-foreground flex items-center gap-2">
-                    <Megaphone className="h-4 w-4 text-primary" />
-                    Recent Announcements
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Latest updates and notifications
-                  </p>
+              <PopoverContent className="w-96 p-0 glass-card" align="end">
+                {/* Header */}
+                <div className="p-4 border-b border-border flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-foreground flex items-center gap-2">
+                      <Bell className="h-4 w-4 text-primary" />
+                      Notifications
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up!'}
+                    </p>
+                  </div>
+                  {unreadCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-primary h-7"
+                      onClick={() => markAllRead()}
+                    >
+                      <CheckCheck className="h-3 w-3 mr-1" />
+                      Mark all read
+                    </Button>
+                  )}
                 </div>
-                <ScrollArea className="max-h-[400px]">
+
+                {/* Notification list */}
+                <ScrollArea className="max-h-[380px]">
                   <div className="p-2">
-                    {recentAnnouncements.map((announcement, index) => (
-                      <div
-                        key={announcement._id || announcement.id || `announcement-${index}`}
-                        className="p-3 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer mb-2"
-                        onClick={() => {
-                          setNotificationOpen(false);
-                          navigate(
-                            userRole === 'admin' 
-                              ? '/admin/announcements' 
-                              : userRole === 'hr' 
-                              ? '/hr/announcements' 
-                              : userRole === 'client'
-                              ? '/client'
-                              : '/employee/announcements'
-                          );
-                        }}
-                      >
-                        <div className="flex items-start gap-3">
-                          {getPriorityIcon(announcement.priority)}
+                    {previewNotifications.length === 0 ? (
+                      <div className="flex flex-col items-center py-8 text-muted-foreground">
+                        <Bell className="h-8 w-8 mb-2 opacity-30" />
+                        <p className="text-sm">No notifications yet</p>
+                      </div>
+                    ) : (
+                      previewNotifications.map((n) => (
+                        <div
+                          key={n.id}
+                          className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer mb-1 transition-colors hover:bg-secondary/60 ${
+                            !n.read ? 'bg-primary/5' : ''
+                          }`}
+                          onClick={() => {
+                            if (!n.read) markAsRead(n.id);
+                            setNotificationOpen(false);
+                            if (n.link) navigate(n.link);
+                          }}
+                        >
+                          <div className={`w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center ${
+                            !n.read ? 'bg-primary/20' : 'bg-secondary'
+                          }`}>
+                            {getNotifIcon(n.type)}
+                          </div>
                           <div className="flex-1 min-w-0">
-                            <p className={cn(
-                              "text-sm font-medium text-foreground truncate",
-                              getPriorityColor(announcement.priority)
-                            )}>
-                              {announcement.title}
+                            <div className="flex items-center gap-1.5">
+                              <p className={`text-sm font-medium truncate ${
+                                !n.read ? 'text-foreground' : 'text-muted-foreground'
+                              }`}>
+                                {n.title}
+                              </p>
+                              {!n.read && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate mt-0.5">
+                              {n.message}
                             </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {announcement.createdAt ? new Date(announcement.createdAt).toLocaleDateString() : announcement.date}
+                            <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                              {formatTimeAgo(n.time)}
                             </p>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </ScrollArea>
+
+                {/* Footer */}
                 <div className="p-3 border-t border-border">
                   <Button
                     variant="ghost"
                     className="w-full justify-between text-sm"
                     onClick={() => {
                       setNotificationOpen(false);
-                      navigate(
-                        userRole === 'admin' 
-                          ? '/admin/announcements' 
-                          : userRole === 'hr' 
-                          ? '/hr/announcements' 
-                          : userRole === 'client'
-                          ? '/client'
-                          : '/employee/announcements'
-                      );
+                      navigate(getNotifLink());
                     }}
                   >
-                    View All Announcements
+                    View All Notifications
                     <ArrowRight className="h-4 w-4" />
                   </Button>
                 </div>

@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useApi } from '@/hooks/useApi';
-import { leaveAPI, employeeAPI } from '@/lib/apiClient';
+import { leaveAPI, leaveBalanceAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
 
 interface LeaveRequest {
@@ -85,7 +85,7 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
 
   useEffect(() => {
     fetchLeaves();
-    if (role === 'employee') {
+    if (role === 'employee' || role === 'hr') {
       fetchLeaveBalance();
     }
   }, [role]);
@@ -107,15 +107,14 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
 
   const fetchLeaveBalance = async () => {
     try {
-      const result = await execute(() => employeeAPI.getLeaveBalance());
+      const result = await execute(() => leaveBalanceAPI.getMyBalance());
       if (result?.data) {
-        // Transform the object into an array format
-        const balanceArray = Object.entries(result.data).map(([type, value]) => ({
-          leaveType: type.charAt(0).toUpperCase() + type.slice(1), // Capitalize first letter
-          total: value as number,
-          used: 0, // Backend doesn't track used, only remaining
-          remaining: value as number,
-        }));
+        const d = result.data;
+        const balanceArray = [
+          { leaveType: 'Paid', total: d.paid || 0, used: d.usedPaid || 0, remaining: (d.paid || 0) - (d.usedPaid || 0) },
+          { leaveType: 'Sick', total: d.sick || 0, used: d.usedSick || 0, remaining: (d.sick || 0) - (d.usedSick || 0) },
+          { leaveType: 'Unpaid', total: d.unpaid || 0, used: d.usedUnpaid || 0, remaining: (d.unpaid || 0) - (d.usedUnpaid || 0) },
+        ];
         setLeaveBalance(balanceArray);
       }
     } catch (error: any) {
@@ -141,7 +140,7 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
       setIsDialogOpen(false);
       setFormData({ leaveType: '', startDate: '', endDate: '', reason: '' });
       fetchLeaves();
-      if (role === 'employee') fetchLeaveBalance();
+      if (role === 'employee' || role === 'hr') fetchLeaveBalance();
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -212,8 +211,8 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
   return (
     <DashboardLayout>
       <div className="space-y-6 fade-in">
-        {/* Leave Balance Cards (for employees) */}
-        {role === 'employee' && (
+        {/* Leave Balance Cards (for employees & HR) */}
+        {(role === 'employee' || role === 'hr') && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {leaveBalance.map((leave) => (
               <Card key={leave.leaveType} className="glass-card card-hover">
@@ -332,11 +331,8 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
                               <SelectValue placeholder="Select type" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="casual">Casual Leave</SelectItem>
+                              <SelectItem value="paid">Paid Leave</SelectItem>
                               <SelectItem value="sick">Sick Leave</SelectItem>
-                              <SelectItem value="annual">Annual Leave</SelectItem>
-                              <SelectItem value="maternity">Maternity Leave</SelectItem>
-                              <SelectItem value="paternity">Paternity Leave</SelectItem>
                               <SelectItem value="unpaid">Unpaid Leave</SelectItem>
                             </SelectContent>
                           </Select>

@@ -4,15 +4,18 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
 // Pages
 import Login from "./pages/Login";
+import NotificationsPage from "./pages/NotificationsPage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminCompanies from "./pages/admin/AdminCompanies";
 import AdminHRAccounts from "./pages/admin/AdminHRAccounts";
 import AdminEmployees from "./pages/admin/AdminEmployees";
 import AdminLeaves from "./pages/admin/AdminLeaves";
+import AdminLeaveManagement from "./pages/admin/AdminLeaveManagement";
 import AdminTasks from "./pages/admin/AdminTasks";
 import HRDetail from "./pages/admin/HRDetail";import AdminClients from './pages/admin/AdminClients';import HRDashboard from "./pages/hr/HRDashboard";
 import HREmployees from "./pages/hr/HREmployees";
@@ -23,7 +26,9 @@ import HRAttendance from "./pages/hr/HRAttendance";import HRClients from './page
 import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
 import EmployeeProfile from "./pages/employee/EmployeeProfile";
 import EmployeeAttendance from "./pages/employee/EmployeeAttendance";
-import EmployeeTasks from "./pages/employee/EmployeeTasks";import ClientDashboard from './pages/client/ClientDashboard';
+import EmployeeTasks from "./pages/employee/EmployeeTasks";
+import CompanyPolicies from './pages/CompanyPolicies';
+import ClientDashboard from './pages/client/ClientDashboard';
 // Modules
 import ChatModule from "./components/modules/ChatModule";
 import AttendanceModule from "./components/modules/AttendanceModule";
@@ -38,14 +43,15 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            {/* Auth Routes */}
-            <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route path="/login" element={<Login />} />
+      <NotificationProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              {/* Auth Routes */}
+              <Route path="/" element={<Navigate to="/login" replace />} />
+              <Route path="/login" element={<Login />} />
 
             {/* Admin Routes - Protected */}
             <Route path="/admin" element={<ProtectedRoute allowedRole="admin"><AdminDashboard /></ProtectedRoute>} />
@@ -55,6 +61,7 @@ const App = () => (
             <Route path="/admin/employees" element={<ProtectedRoute allowedRole="admin"><AdminEmployees /></ProtectedRoute>} />
             <Route path="/admin/employees/:employeeId" element={<ProtectedRoute allowedRole="admin"><EmployeeDetail /></ProtectedRoute>} />
             <Route path="/admin/leaves" element={<ProtectedRoute allowedRole="admin"><AdminLeaves /></ProtectedRoute>} />
+            <Route path="/admin/leave-management" element={<ProtectedRoute allowedRole="admin"><AdminLeaveManagement /></ProtectedRoute>} />
             <Route path="/admin/tasks" element={<ProtectedRoute allowedRole="admin"><AdminTasks /></ProtectedRoute>} />
             <Route path="/admin/clients" element={<ProtectedRoute allowedRole="admin"><AdminClients /></ProtectedRoute>} />
             <Route path="/admin/chat" element={<ProtectedRoute allowedRole="admin"><ChatModule role="admin" /></ProtectedRoute>} />
@@ -62,6 +69,8 @@ const App = () => (
             <Route path="/admin/attendance-requests" element={<ProtectedRoute allowedRole="admin"><HRAttendanceRequests /></ProtectedRoute>} />
             <Route path="/admin/expenses" element={<ProtectedRoute allowedRole="admin"><ExpensesModule role="admin" /></ProtectedRoute>} />
             <Route path="/admin/announcements" element={<ProtectedRoute allowedRole="admin"><AnnouncementsModule role="admin" /></ProtectedRoute>} />
+            <Route path="/admin/notifications" element={<ProtectedRoute allowedRole="admin"><NotificationsPage /></ProtectedRoute>} />
+            <Route path="/admin/policies" element={<ProtectedRoute allowedRole="admin"><CompanyPolicies /></ProtectedRoute>} />
             <Route path="/admin/*" element={<ProtectedRoute allowedRole="admin"><AdminDashboard /></ProtectedRoute>} />
 
             {/* HR Routes - Protected */}
@@ -78,6 +87,8 @@ const App = () => (
             <Route path="/hr/clients" element={<ProtectedRoute allowedRole="hr"><HRClients /></ProtectedRoute>} />
             <Route path="/hr/expenses" element={<ProtectedRoute allowedRole="hr"><ExpensesModule role="hr" /></ProtectedRoute>} />
             <Route path="/hr/announcements" element={<ProtectedRoute allowedRole="hr"><AnnouncementsModule role="hr" /></ProtectedRoute>} />
+            <Route path="/hr/notifications" element={<ProtectedRoute allowedRole="hr"><NotificationsPage /></ProtectedRoute>} />
+            <Route path="/hr/policies" element={<ProtectedRoute allowedRole="hr"><CompanyPolicies /></ProtectedRoute>} />
             <Route path="/hr/*" element={<ProtectedRoute allowedRole="hr"><HRDashboard /></ProtectedRoute>} />
 
             {/* Employee Routes - Protected */}
@@ -90,11 +101,14 @@ const App = () => (
             <Route path="/employee/tasks" element={<ProtectedRoute allowedRole="employee"><EmployeeTasks /></ProtectedRoute>} />
             <Route path="/employee/expenses" element={<ProtectedRoute allowedRole="employee"><ExpensesModule role="employee" /></ProtectedRoute>} />
             <Route path="/employee/announcements" element={<ProtectedRoute allowedRole="employee"><AnnouncementsModule role="employee" /></ProtectedRoute>} />
+            <Route path="/employee/notifications" element={<ProtectedRoute allowedRole="employee"><NotificationsPage /></ProtectedRoute>} />
+            <Route path="/employee/policies" element={<ProtectedRoute allowedRole="employee"><CompanyPolicies /></ProtectedRoute>} />
             <Route path="/employee/*" element={<ProtectedRoute allowedRole="employee"><EmployeeDashboard /></ProtectedRoute>} />
 
             {/* Client Routes - Protected */}
             <Route path="/client" element={<ProtectedRoute allowedRole="client"><ClientDashboard /></ProtectedRoute>} />
             <Route path="/client/chat" element={<ProtectedRoute allowedRole="client"><ChatModule role="client" /></ProtectedRoute>} />
+            <Route path="/client/notifications" element={<ProtectedRoute allowedRole="client"><NotificationsPage /></ProtectedRoute>} />
             <Route path="/client/*" element={<ProtectedRoute allowedRole="client"><ClientDashboard /></ProtectedRoute>} />
 
             {/* Fallback */}
@@ -102,8 +116,9 @@ const App = () => (
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
-    </AuthProvider>
-  </QueryClientProvider>
+    </NotificationProvider>
+  </AuthProvider>
+</QueryClientProvider>
 );
 
 export default App;

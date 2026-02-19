@@ -81,6 +81,17 @@ export const leaveAPI = {
   getStatistics: (params?: any) => api.get('/leaves/statistics', { params }),
 };
 
+// Leave Balance APIs (Admin-controlled)
+export const leaveBalanceAPI = {
+  getAll: (params?: any) => api.get('/leave-balance', { params }),
+  getByUser: (userId: string) => api.get(`/leave-balance/${userId}`),
+  getMyBalance: () => api.get('/leave-balance/me'),
+  assign: (userId: string, data: { paid?: number; sick?: number; unpaid?: number }) =>
+    api.put(`/leave-balance/${userId}`, data),
+  bulkAssign: (data: { userIds: string[]; paid: number; sick: number; unpaid: number }) =>
+    api.post('/leave-balance/bulk', data),
+};
+
 // Attendance APIs
 export const attendanceAPI = {
   // Check in with optional photo (FormData for photo upload)
@@ -119,6 +130,10 @@ export const attendanceAPI = {
   getPendingEditRequests: () => api.get('/attendance/edit-requests/pending'),
   reviewEditRequest: (requestId: string, action: 'approved' | 'rejected', reviewNote?: string) =>
     api.put(`/attendance/edit-requests/${requestId}`, { action, reviewNote }),
+
+  // Half Day Request
+  requestHalfDay: (data: { date: string; reason: string }) =>
+    api.post('/attendance/half-day-request', data),
 };
 
 // Task APIs
@@ -260,6 +275,18 @@ export const announcementAPI = {
   getUnreadCount: () => api.get('/announcements/unread/count'),
 };
 
+// Policy APIs
+export const policyAPI = {
+  getPolicies: (params?: any) => api.get('/policies', { params }),
+  getPolicyById: (id: string) => api.get(`/policies/${id}`),
+  createPolicy: (data: FormData) =>
+    api.post('/policies', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  deletePolicy: (id: string) => api.delete(`/policies/${id}`),
+  // Fetches file as blob so JWT auth header is included automatically
+  downloadFile: (id: string) =>
+    api.get(`/policies/${id}/download`, { responseType: 'blob' }),
+};
+
 // User APIs
 export const userAPI = {
   getUsers: (params?: any) => api.get('/user', { params }),
@@ -282,4 +309,5 @@ export default {
   company: companyAPI,
   announcement: announcementAPI,
   user: userAPI,
+  policy: policyAPI,
 };
