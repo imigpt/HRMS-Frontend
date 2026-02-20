@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { CalendarCheck, Check, X, Building2, UserCircle, Filter, Loader2 } from 'lucide-react';
+import { CalendarCheck, Check, X, Building2, UserCircle, Filter, Loader2, Edit2, Trash2 } from 'lucide-react';
 import { adminAPI, leaveAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -25,13 +25,16 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 interface LeaveRequest {
   _id: string;
   user?: {
     name: string;
     employeeId: string;
+    email?: string;
     department?: string;
+    company?: { name: string };
   };
   employee?: {
     name: string;
@@ -39,13 +42,14 @@ interface LeaveRequest {
     company?: { name: string };
     department?: string;
   };
-  leaveType: 'casual' | 'sick' | 'annual' | 'unpaid';
+  company?: { name: string } | string;
+  leaveType: 'paid' | 'sick' | 'unpaid';
   startDate: string;
   endDate: string;
   days: number;
   reason: string;
-  status: 'pending' | 'approved' | 'rejected';
-  appliedOn: string;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  createdAt: string;
 }
 
 const AdminLeaves = () => {
@@ -60,6 +64,16 @@ const AdminLeaves = () => {
   const [selectedLeaveId, setSelectedLeaveId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    leaveType: '',
+    startDate: '',
+    endDate: '',
+    reason: '',
+    status: '',
+  });
+  const [selectedLeaveForEdit, setSelectedLeaveForEdit] = useState<LeaveRequest | null>(null);
 
   const fetchLeaves = useCallback(async () => {
     try {
@@ -136,8 +150,58 @@ const AdminLeaves = () => {
     setRejectDialogOpen(true);
   };
 
+  const openEditDialog = (request: LeaveRequest) => {
+    setSelectedLeaveForEdit(request);
+    setEditFormData({
+      leaveType: request.leaveType,
+      startDate: request.startDate ? new Date(request.startDate).toISOString().split('T')[0] : '',
+      endDate: request.endDate ? new Date(request.endDate).toISOString().split('T')[0] : '',
+      reason: request.reason,
+      status: request.status,
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleEditLeave = async () => {
+    if (!selectedLeaveForEdit) return;
+    try {
+      setActionLoading(true);
+      await leaveAPI.editLeave(selectedLeaveForEdit._id, editFormData);
+      toast({ title: 'Success', description: 'Leave request updated successfully' });
+      setEditDialogOpen(false);
+      setSelectedLeaveForEdit(null);
+      fetchLeaves();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.response?.data?.message || 'Failed to update leave', variant: 'destructive' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const openDeleteDialog = (leaveId: string) => {
+    setSelectedLeaveId(leaveId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteLeave = async () => {
+    if (!selectedLeaveId) return;
+    try {
+      setActionLoading(true);
+      await leaveAPI.deleteLeave(selectedLeaveId);
+      toast({ title: 'Success', description: 'Leave request deleted successfully' });
+      setDeleteDialogOpen(false);
+      setSelectedLeaveId(null);
+      fetchLeaves();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.response?.data?.message || 'Failed to delete leave', variant: 'destructive' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const filteredRequests = leaveRequests.filter(req => {
-    const matchesCompany = companyFilter === 'all' || req.employee.company?.name === companyFilter;
+    const companyName = req.user?.company?.name || req.company?.name || '';
+    const matchesCompany = companyFilter === 'all' || companyName === companyFilter;
     const matchesType = typeFilter === 'all' || req.leaveType === typeFilter;
     const matchesStatus = statusFilter === 'all' || req.status === statusFilter;
     return matchesCompany && matchesType && matchesStatus;
@@ -152,12 +216,11 @@ const AdminLeaves = () => {
 
   const getLeaveTypeBadge = (type: string) => {
     const colors: Record<string, string> = {
-      casual: 'bg-blue-500/20 text-blue-400',
+      paid: 'bg-blue-500/20 text-blue-400',
       sick: 'bg-red-500/20 text-red-400',
-      annual: 'bg-purple-500/20 text-purple-400',
       unpaid: 'bg-gray-500/20 text-gray-400',
     };
-    return <Badge className={colors[type]}>{type.charAt(0).toUpperCase() + type.slice(1)}</Badge>;
+    return <Badge className={colors[type] || 'bg-gray-500/20 text-gray-400'}>{type.charAt(0).toUpperCase() + type.slice(1)}</Badge>;
   };
 
   const getStatusBadge = (status: string) => {
@@ -353,34 +416,56 @@ const AdminLeaves = () => {
                       <p className="text-sm line-clamp-2">{request.reason}</p>
                     </TableCell>
                     <TableCell className="text-sm">
-                      {new Date(request.appliedOn).toLocaleDateString()}
+                      {new Date(request.createdAt).toLocaleDateString()}
                     </TableCell>
                     <TableCell>{getStatusBadge(request.status)}</TableCell>
                     <TableCell className="text-right">
-                      {request.status === 'pending' ? (
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-success hover:text-success hover:bg-success/10"
-                            onClick={() => handleApprove(request._id)}
-                            disabled={actionLoading}
-                          >
-                            <Check className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => openRejectDialog(request._id)}
-                            disabled={actionLoading}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">No action</span>
-                      )}
+                      <div className="flex items-center justify-end gap-1">
+                        {request.status === 'pending' && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-success hover:text-success hover:bg-success/10"
+                              onClick={() => handleApprove(request._id)}
+                              disabled={actionLoading}
+                              title="Approve"
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => openRejectDialog(request._id)}
+                              disabled={actionLoading}
+                              title="Reject"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-primary hover:text-primary hover:bg-primary/10"
+                          onClick={() => openEditDialog(request)}
+                          disabled={actionLoading}
+                          title="Edit"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => openDeleteDialog(request._id)}
+                          disabled={actionLoading}
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                   );
@@ -437,6 +522,101 @@ const AdminLeaves = () => {
               ) : (
                 'Reject Leave'
               )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Leave Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Leave Request</DialogTitle>
+            <DialogDescription>
+              {selectedLeaveForEdit?.user?.name || 'Employee'} — Modify leave details
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Leave Type</Label>
+              <Select value={editFormData.leaveType} onValueChange={(val) => setEditFormData({ ...editFormData, leaveType: val })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="paid">Paid Leave</SelectItem>
+                  <SelectItem value="sick">Sick Leave</SelectItem>
+                  <SelectItem value="unpaid">Unpaid Leave</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>From Date</Label>
+                <Input
+                  type="date"
+                  value={editFormData.startDate}
+                  onChange={(e) => setEditFormData({ ...editFormData, startDate: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>To Date</Label>
+                <Input
+                  type="date"
+                  value={editFormData.endDate}
+                  onChange={(e) => setEditFormData({ ...editFormData, endDate: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={editFormData.status} onValueChange={(val) => setEditFormData({ ...editFormData, status: val })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Reason</Label>
+              <Textarea
+                value={editFormData.reason}
+                onChange={(e) => setEditFormData({ ...editFormData, reason: e.target.value })}
+                rows={3}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)} disabled={actionLoading}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditLeave} disabled={actionLoading}>
+              {actionLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : 'Save Changes'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Leave Request</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this leave request? This action cannot be undone. The employee will be notified.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-3 mt-4">
+            <Button variant="outline" onClick={() => { setDeleteDialogOpen(false); setSelectedLeaveId(null); }} disabled={actionLoading}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteLeave} disabled={actionLoading}>
+              {actionLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Deleting...</> : 'Delete Leave'}
             </Button>
           </div>
         </DialogContent>

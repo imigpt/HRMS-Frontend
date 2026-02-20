@@ -77,6 +77,8 @@ export const leaveAPI = {
   rejectLeave: (id: string, reviewNote?: string) => 
     api.put(`/leaves/${id}/reject`, { reviewNote }),
   cancelLeave: (id: string) => api.put(`/leaves/${id}/cancel`),
+  editLeave: (id: string, data: any) => api.put(`/leaves/${id}`, data),
+  deleteLeave: (id: string) => api.delete(`/leaves/${id}`),
   getBalance: () => api.get('/leaves/balance'),
   getStatistics: (params?: any) => api.get('/leaves/statistics', { params }),
 };
@@ -271,6 +273,14 @@ export const announcementAPI = {
   getUnreadCount: () => api.get('/announcements/unread/count'),
 };
 
+// Notification APIs
+export const notificationAPI = {
+  getNotifications: (params?: any) => api.get('/notifications', { params }),
+  markAsRead: (id: string) => api.put(`/notifications/${id}/read`),
+  markAllAsRead: () => api.put('/notifications/read-all'),
+  deleteNotification: (id: string) => api.delete(`/notifications/${id}`),
+};
+
 // User APIs
 export const userAPI = {
   getUsers: (params?: any) => api.get('/user', { params }),
@@ -293,5 +303,6 @@ export default {
   chat: chatAPI,
   company: companyAPI,
   announcement: announcementAPI,
+  notification: notificationAPI,
   user: userAPI,
 };

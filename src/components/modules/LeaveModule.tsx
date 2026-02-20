@@ -108,9 +108,9 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
   const fetchLeaveBalance = async () => {
     try {
       const result = await execute(() => leaveBalanceAPI.getMyBalance());
-      if (result?.data?.data) {
+      if (result?.data) {
         // Transform backend balance object into array format
-        const balance = result.data.data;
+        const balance = result.data;
         const balanceArray = [
           {
             leaveType: 'Paid',
@@ -156,7 +156,7 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
       setIsDialogOpen(false);
       setFormData({ leaveType: '', startDate: '', endDate: '', reason: '' });
       fetchLeaves();
-      if (role === 'employee') fetchLeaveBalance();
+      if (role === 'employee' || role === 'hr') fetchLeaveBalance();
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -221,7 +221,7 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
     return request.status === filter;
   });
 
-  const canApprove = role === 'hr' || role === 'admin';
+  const canApprove = role === 'admin';
   const canApply = role === 'employee' || role === 'hr';
 
   return (
@@ -353,6 +353,44 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
                             </SelectContent>
                           </Select>
                         </div>
+
+                        {/* Balance info for selected leave type */}
+                        {formData.leaveType && leaveBalance.length > 0 && (() => {
+                          const matchLabel = formData.leaveType === 'paid' ? 'Paid' : formData.leaveType === 'sick' ? 'Sick' : 'Unpaid';
+                          const bal = leaveBalance.find(b => b.leaveType === matchLabel);
+                          if (!bal) return null;
+                          const remaining = (bal.total || 0) - (bal.used || 0);
+                          const exhausted = remaining <= 0 && formData.leaveType !== 'unpaid';
+                          return (
+                            <div className={cn(
+                              'p-3 rounded-lg border text-sm',
+                              exhausted
+                                ? 'bg-destructive/10 border-destructive/40'
+                                : 'bg-primary/5 border-primary/20'
+                            )}>
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium text-foreground">{matchLabel} Leave Balance</span>
+                                <span className={cn('font-semibold', exhausted ? 'text-destructive' : 'text-primary')}>
+                                  {remaining} remaining
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Assigned: {bal.total} &nbsp;|&nbsp; Used: {bal.used}
+                              </p>
+                              {exhausted && (
+                                <p className="text-destructive font-medium mt-2 text-xs">
+                                  No more {matchLabel} Leaves left. Try Unpaid Leave instead.
+                                </p>
+                              )}
+                              {formData.leaveType === 'unpaid' && (
+                                <p className="text-muted-foreground mt-2 text-xs italic">
+                                  Unpaid leave can be applied anytime — requires Admin approval.
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })()}
+
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <Label>From Date</Label>
@@ -382,7 +420,17 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
                             onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
                           />
                         </div>
-                        <Button className="w-full glow-button" onClick={handleCreateLeave} disabled={loading}>
+                        <Button
+                          className="w-full glow-button"
+                          onClick={handleCreateLeave}
+                          disabled={loading || (() => {
+                            if (!formData.leaveType || formData.leaveType === 'unpaid') return false;
+                            const matchLabel = formData.leaveType === 'paid' ? 'Paid' : 'Sick';
+                            const bal = leaveBalance.find(b => b.leaveType === matchLabel);
+                            if (!bal) return false;
+                            return (bal.total - bal.used) <= 0;
+                          })()}
+                        >
                           {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Submitting...</> : 'Submit Request'}
                         </Button>
                       </div>
@@ -411,7 +459,7 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
                       <div>
                         <p className="font-medium text-foreground">{employeeName}</p>
                         <p className="text-sm text-muted-foreground">
-                          {request.leaveType} • {new Date(request.endDate).getDate() - new Date(request.startDate).getDate() + 1} day(s)
+                          {request.leaveType.charAt(0).toUpperCase() + request.leaveType.slice(1)} Leave • {new Date(request.endDate).getDate() - new Date(request.startDate).getDate() + 1} day(s)
                         </p>
                       </div>
                     </div>
@@ -419,9 +467,9 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
                       <div className="text-right">
                         <p className="text-sm text-foreground flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {request.from} - {request.to}
+                          {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()}
                         </p>
-                        <p className="text-xs text-muted-foreground">Applied: {request.appliedOn}</p>
+                        <p className="text-xs text-muted-foreground">Applied: {new Date(request.createdAt).toLocaleDateString()}</p>
                       </div>
                       {getStatusBadge(request.status)}
                       {canApprove && request.status === 'pending' && (

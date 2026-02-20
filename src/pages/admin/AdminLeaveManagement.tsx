@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,7 +16,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useApi } from '@/hooks/useApi';
-import { leaveBalanceAPI, employeeAPI } from '@/lib/apiClient';
+import { leaveBalanceAPI, adminAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
 
 interface LeaveBalance {
@@ -69,8 +70,8 @@ const AdminLeaveManagement = () => {
   const fetchLeaveBalances = async () => {
     try {
       const result = await execute(() => leaveBalanceAPI.getAll());
-      if (result?.data?.data) {
-        setBalances(result.data.data);
+      if (result?.data) {
+        setBalances(result.data);
       }
     } catch (error: any) {
       toast({
@@ -83,9 +84,9 @@ const AdminLeaveManagement = () => {
 
   const fetchEmployees = async () => {
     try {
-      const result = await execute(() => employeeAPI.getEmployees());
-      if (result?.data?.data) {
-        setEmployees(result.data.data);
+      const result = await execute(() => adminAPI.getEmployees());
+      if (result?.data) {
+        setEmployees(result.data);
       }
     } catch (error: any) {
       console.error('Failed to fetch employees:', error);
@@ -290,22 +291,23 @@ const AdminLeaveManagement = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b">
+                    <tr className="border-b">
                     <th className="text-left py-3 px-4 font-semibold">Employee</th>
                     <th className="text-left py-3 px-4 font-semibold">Position</th>
                     <th className="text-center py-3 px-4 font-semibold">Paid</th>
                     <th className="text-center py-3 px-4 font-semibold">Sick</th>
                     <th className="text-center py-3 px-4 font-semibold">Unpaid</th>
+                    <th className="text-center py-3 px-4 font-semibold">Total</th>
                     <th className="text-center py-3 px-4 font-semibold">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredBalances.map((balance) => (
-                    <tr key={balance._id} className="border-b hover:bg-gray-50">
+                    <tr key={balance._id} className="border-b hover:bg-gray-50 group">
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
                           <Avatar>
-                            <AvatarFallback>
+                              <AvatarFallback className="text-foreground group-hover:text-black">
                               {balance.user.name
                                 .split(' ')
                                 .map((n) => n[0])
@@ -313,30 +315,37 @@ const AdminLeaveManagement = () => {
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <p className="font-medium">{balance.user.name}</p>
-                            <p className="text-xs text-gray-500">{balance.user.email}</p>
+                            <p className="font-medium text-foreground group-hover:text-black">{balance.user.name}</p>
+                            <p className="text-xs text-muted-foreground group-hover:text-black">{balance.user.email}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="py-3 px-4">{balance.user.position || 'N/A'}</td>
+                      <td className="py-3 px-4 text-foreground group-hover:text-black">{balance.user.position || 'N/A'}</td>
                       <td className="py-3 px-4 text-center">
-                        <div>
-                          <p className="font-semibold">{balance.paid - balance.usedPaid}</p>
-                          <p className="text-xs text-gray-500">/{balance.paid}</p>
+                        <div className="flex flex-col items-start text-left">
+                          <p className="text-xs text-muted-foreground group-hover:text-black">left : <span className="font-semibold text-foreground group-hover:text-black">{balance.paid - balance.usedPaid}</span></p>
+                          <p className="text-xs text-muted-foreground group-hover:text-black">assigned : <span className="font-semibold text-foreground group-hover:text-black">{balance.paid}</span></p>
                         </div>
                       </td>
                       <td className="py-3 px-4 text-center">
-                        <div>
-                          <p className="font-semibold">{balance.sick - balance.usedSick}</p>
-                          <p className="text-xs text-gray-500">/{balance.sick}</p>
+                        <div className="flex flex-col items-start text-left">
+                          <p className="text-xs text-muted-foreground group-hover:text-black">left : <span className="font-semibold text-foreground group-hover:text-black">{balance.sick - balance.usedSick}</span></p>
+                          <p className="text-xs text-muted-foreground group-hover:text-black">assigned : <span className="font-semibold text-foreground group-hover:text-black">{balance.sick}</span></p>
                         </div>
                       </td>
                       <td className="py-3 px-4 text-center">
-                        <div>
-                          <p className="font-semibold">{balance.unpaid - balance.usedUnpaid}</p>
-                          <p className="text-xs text-gray-500">/{balance.unpaid}</p>
+                        <div className="flex flex-col items-start text-left">
+                          <p className="text-xs text-muted-foreground group-hover:text-black">left : <span className="font-semibold text-foreground group-hover:text-black">{balance.unpaid - balance.usedUnpaid}</span></p>
+                          <p className="text-xs text-muted-foreground group-hover:text-black">assigned : <span className="font-semibold text-foreground group-hover:text-black">{balance.unpaid}</span></p>
                         </div>
                       </td>
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex flex-col items-start text-left">
+                          <p className="text-xs text-muted-foreground group-hover:text-black">left : <span className="font-semibold text-foreground group-hover:text-black">{ (balance.paid - balance.usedPaid) + (balance.sick - balance.usedSick) + (balance.unpaid - balance.usedUnpaid) }</span></p>
+                          <p className="text-xs text-muted-foreground group-hover:text-black">assigned : <span className="font-semibold text-foreground group-hover:text-black">{ balance.paid + balance.sick + balance.unpaid }</span></p>
+                        </div>
+                      </td>
+
                       <td className="py-3 px-4 text-center">
                         <Dialog open={isEditDialogOpen && selectedBalance?._id === balance._id} onOpenChange={setIsEditDialogOpen}>
                           <DialogTrigger asChild>

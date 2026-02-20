@@ -6,8 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Badge } from '@/components/ui/badge';
-import { announcementAPI } from '@/lib/apiClient';
+import { notificationAPI } from '@/lib/apiClient';
 import {
   LayoutDashboard,
   Building2,
@@ -29,9 +28,7 @@ import {
   Menu,
   X,
   User,
-  AlertTriangle,
   Bell,
-  Info,
   ArrowRight,
   UserCheck,
 } from 'lucide-react';
@@ -79,6 +76,7 @@ const employeeNavItems: NavItem[] = [
   { title: 'Dashboard', href: '/employee', icon: LayoutDashboard },
   { title: 'My Profile', href: '/employee/profile', icon: UserCircle },
   { title: 'Attendance', href: '/employee/attendance', icon: Clock },
+  { title: 'Leave', href: '/employee/leave', icon: CalendarCheck },
   { title: 'Tasks', href: '/employee/tasks', icon: ClipboardList },
   { title: 'Expenses', href: '/employee/expenses', icon: Receipt },
   { title: 'Chat', href: '/employee/chat', icon: MessageSquare },
@@ -130,24 +128,29 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const { userRole, userName, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [notificationOpen, setNotificationOpen] = useState(false);
-  const [recentAnnouncements, setRecentAnnouncements] = useState<any[]>([]);
+  const [notifBellOpen, setNotifBellOpen] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const navItems = getNavItems(userRole);
 
-  // Fetch recent announcements
-  useEffect(() => {
-    const fetchAnnouncements = async () => {
-      try {
-        const response = await announcementAPI.getAnnouncements({ limit: 3 });
-        if (response.data?.data) {
-          setRecentAnnouncements(response.data.data.slice(0, 3));
-        }
-      } catch (error) {
-        console.error('Failed to fetch announcements:', error);
+  // Fetch notifications
+  const fetchNotifications = async () => {
+    try {
+      const response = await notificationAPI.getNotifications({ limit: 10 });
+      if (response.data?.data) {
+        setNotifications(response.data.data);
+        setUnreadCount(response.data.unreadCount || 0);
       }
-    };
-    fetchAnnouncements();
+    } catch (error) {
+      console.error('Failed to fetch notifications:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleLogout = () => {
@@ -155,25 +158,28 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     navigate('/login');
   };
 
-  const getPriorityIcon = (priority: string) => {
-    switch (priority) {
-      case 'high':
-        return <AlertTriangle className="h-4 w-4 text-destructive" />;
-      case 'medium':
-        return <Bell className="h-4 w-4 text-warning" />;
-      default:
-        return <Info className="h-4 w-4 text-primary" />;
+  const getNotifTypeIcon = (type: string) => {
+    switch (type) {
+      case 'leave': return <CalendarDays className="h-4 w-4 text-blue-500" />;
+      case 'attendance': return <Clock className="h-4 w-4 text-green-500" />;
+      case 'task': return <ClipboardList className="h-4 w-4 text-purple-500" />;
+      case 'expense': return <Receipt className="h-4 w-4 text-orange-500" />;
+      case 'announcement': return <Megaphone className="h-4 w-4 text-pink-500" />;
+      case 'chat': return <MessageSquare className="h-4 w-4 text-teal-500" />;
+      default: return <Bell className="h-4 w-4 text-primary" />;
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high':
-        return 'text-destructive';
-      case 'medium':
-        return 'text-warning';
-      default:
-        return 'text-primary';
+  const getNotifNavigationPath = (notif: any) => {
+    const base = `/${userRole}`;
+    switch (notif.type) {
+      case 'leave': return `${base}/leaves`;
+      case 'attendance': return `${base}/attendance`;
+      case 'task': return `${base}/tasks`;
+      case 'expense': return `${base}/expenses`;
+      case 'announcement': return `${base}/announcements`;
+      case 'chat': return `${base}/chat`;
+      default: return `${base}/notifications`;
     }
   };
 
@@ -305,85 +311,94 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           </div>
 
           <div className="flex items-center gap-2">
-            <Popover open={notificationOpen} onOpenChange={setNotificationOpen}>
+            {/* Notification Bell */}
+            <Popover open={notifBellOpen} onOpenChange={setNotifBellOpen}>
               <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative">
-                  <Megaphone className="h-5 w-5" />
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-primary-foreground text-[10px] rounded-full flex items-center justify-center">
-                    {recentAnnouncements.length}
-                  </span>
+                  <Bell className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-destructive-foreground text-[10px] rounded-full flex items-center justify-center">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-80 p-0 glass-card" align="end">
-                <div className="p-4 border-b border-border">
+                <div className="p-4 border-b border-border flex items-center justify-between">
                   <h3 className="font-semibold text-foreground flex items-center gap-2">
-                    <Megaphone className="h-4 w-4 text-primary" />
-                    Recent Announcements
+                    <Bell className="h-4 w-4 text-primary" />
+                    Notifications
                   </h3>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Latest updates and notifications
-                  </p>
+                  {unreadCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-7"
+                      onClick={async () => {
+                        await notificationAPI.markAllAsRead();
+                        fetchNotifications();
+                      }}
+                    >
+                      Mark all read
+                    </Button>
+                  )}
                 </div>
-                <ScrollArea className="max-h-[400px]">
+                <ScrollArea className="max-h-[350px]">
                   <div className="p-2">
-                    {recentAnnouncements.map((announcement, index) => (
-                      <div
-                        key={announcement._id || announcement.id || `announcement-${index}`}
-                        className="p-3 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer mb-2"
-                        onClick={() => {
-                          setNotificationOpen(false);
-                          navigate(
-                            userRole === 'admin' 
-                              ? '/admin/announcements' 
-                              : userRole === 'hr' 
-                              ? '/hr/announcements' 
-                              : userRole === 'client'
-                              ? '/client'
-                              : '/employee/announcements'
-                          );
-                        }}
-                      >
-                        <div className="flex items-start gap-3">
-                          {getPriorityIcon(announcement.priority)}
+                    {notifications.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-6">No notifications</p>
+                    ) : (
+                      notifications.map((notif: any) => (
+                        <div
+                          key={notif._id}
+                          className={cn(
+                            'p-3 rounded-lg transition-colors cursor-pointer mb-1 flex items-start gap-3',
+                            notif.isRead ? 'hover:bg-secondary/50' : 'bg-primary/5 hover:bg-primary/10'
+                          )}
+                          onClick={async () => {
+                            if (!notif.isRead) {
+                              await notificationAPI.markAsRead(notif._id);
+                              fetchNotifications();
+                            }
+                            setNotifBellOpen(false);
+                            navigate(getNotifNavigationPath(notif));
+                          }}
+                        >
+                          <div className="mt-0.5 flex-shrink-0">{getNotifTypeIcon(notif.type)}</div>
                           <div className="flex-1 min-w-0">
-                            <p className={cn(
-                              "text-sm font-medium text-foreground truncate",
-                              getPriorityColor(announcement.priority)
-                            )}>
-                              {announcement.title}
+                            <p className={cn('text-sm leading-snug', !notif.isRead ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
+                              {notif.title || notif.message}
                             </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {announcement.createdAt ? new Date(announcement.createdAt).toLocaleDateString() : announcement.date}
+                            {notif.title && notif.message && (
+                              <p className="text-xs text-muted-foreground mt-0.5 truncate">{notif.message}</p>
+                            )}
+                            <p className="text-xs text-muted-foreground/70 mt-1">
+                              {new Date(notif.createdAt).toLocaleDateString()} &bull; {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </p>
                           </div>
+                          {!notif.isRead && <span className="w-2 h-2 rounded-full bg-primary mt-1.5 flex-shrink-0" />}
                         </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </ScrollArea>
-                <div className="p-3 border-t border-border">
+                <div className="p-2 border-t border-border">
                   <Button
                     variant="ghost"
                     className="w-full justify-between text-sm"
                     onClick={() => {
-                      setNotificationOpen(false);
-                      navigate(
-                        userRole === 'admin' 
-                          ? '/admin/announcements' 
-                          : userRole === 'hr' 
-                          ? '/hr/announcements' 
-                          : userRole === 'client'
-                          ? '/client'
-                          : '/employee/announcements'
-                      );
+                      setNotifBellOpen(false);
+                      navigate(`/${userRole}/notifications`);
                     }}
                   >
-                    View All Announcements
+                    View All Notifications
                     <ArrowRight className="h-4 w-4" />
                   </Button>
                 </div>
               </PopoverContent>
             </Popover>
+
+
           </div>
         </header>
 

@@ -667,10 +667,7 @@ const HRAttendance = () => {
                   </Button>
                 )}
                 
-                <Button variant="outline" size="lg" className="glass-card" onClick={() => navigate('/hr/leave')}>
-                  <FileText className="h-4 w-4 mr-2" />
-                  Apply Leave
-                </Button>
+                {/* Apply Leave button removed from Attendance view */}
               </div>
             </div>
           </CardContent>

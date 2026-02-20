@@ -44,12 +44,12 @@ export interface Leave {
   _id: string;
   employee: User | string;
   company: Company | string;
-  leaveType: 'sick' | 'casual' | 'annual' | 'unpaid';
+  leaveType: 'sick' | 'paid' | 'unpaid';
   startDate: string;
   endDate: string;
   days: number;
   reason: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
   createdAt?: string;
 }
 

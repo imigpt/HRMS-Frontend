@@ -25,6 +25,7 @@ import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
 import EmployeeProfile from "./pages/employee/EmployeeProfile";
 import EmployeeAttendance from "./pages/employee/EmployeeAttendance";
 import EmployeeTasks from "./pages/employee/EmployeeTasks";import ClientDashboard from './pages/client/ClientDashboard';
+import NotificationsPage from './pages/NotificationsPage';
 // Modules
 import ChatModule from "./components/modules/ChatModule";
 import AttendanceModule from "./components/modules/AttendanceModule";
@@ -64,6 +65,7 @@ const App = () => (
             <Route path="/admin/attendance-requests" element={<ProtectedRoute allowedRole="admin"><HRAttendanceRequests /></ProtectedRoute>} />
             <Route path="/admin/expenses" element={<ProtectedRoute allowedRole="admin"><ExpensesModule role="admin" /></ProtectedRoute>} />
             <Route path="/admin/announcements" element={<ProtectedRoute allowedRole="admin"><AnnouncementsModule role="admin" /></ProtectedRoute>} />
+            <Route path="/admin/notifications" element={<ProtectedRoute allowedRole="admin"><NotificationsPage role="admin" /></ProtectedRoute>} />
             <Route path="/admin/*" element={<ProtectedRoute allowedRole="admin"><AdminDashboard /></ProtectedRoute>} />
 
             {/* HR Routes - Protected */}
@@ -80,6 +82,7 @@ const App = () => (
             <Route path="/hr/clients" element={<ProtectedRoute allowedRole="hr"><HRClients /></ProtectedRoute>} />
             <Route path="/hr/expenses" element={<ProtectedRoute allowedRole="hr"><ExpensesModule role="hr" /></ProtectedRoute>} />
             <Route path="/hr/announcements" element={<ProtectedRoute allowedRole="hr"><AnnouncementsModule role="hr" /></ProtectedRoute>} />
+            <Route path="/hr/notifications" element={<ProtectedRoute allowedRole="hr"><NotificationsPage role="hr" /></ProtectedRoute>} />
             <Route path="/hr/*" element={<ProtectedRoute allowedRole="hr"><HRDashboard /></ProtectedRoute>} />
 
             {/* Employee Routes - Protected */}
@@ -92,11 +95,13 @@ const App = () => (
             <Route path="/employee/tasks" element={<ProtectedRoute allowedRole="employee"><EmployeeTasks /></ProtectedRoute>} />
             <Route path="/employee/expenses" element={<ProtectedRoute allowedRole="employee"><ExpensesModule role="employee" /></ProtectedRoute>} />
             <Route path="/employee/announcements" element={<ProtectedRoute allowedRole="employee"><AnnouncementsModule role="employee" /></ProtectedRoute>} />
+            <Route path="/employee/notifications" element={<ProtectedRoute allowedRole="employee"><NotificationsPage role="employee" /></ProtectedRoute>} />
             <Route path="/employee/*" element={<ProtectedRoute allowedRole="employee"><EmployeeDashboard /></ProtectedRoute>} />
 
             {/* Client Routes - Protected */}
             <Route path="/client" element={<ProtectedRoute allowedRole="client"><ClientDashboard /></ProtectedRoute>} />
             <Route path="/client/chat" element={<ProtectedRoute allowedRole="client"><ChatModule role="client" /></ProtectedRoute>} />
+            <Route path="/client/notifications" element={<ProtectedRoute allowedRole="client"><NotificationsPage role="client" /></ProtectedRoute>} />
             <Route path="/client/*" element={<ProtectedRoute allowedRole="client"><ClientDashboard /></ProtectedRoute>} />
 
             {/* Fallback */}
