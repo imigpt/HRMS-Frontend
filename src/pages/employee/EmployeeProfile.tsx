@@ -20,6 +20,7 @@ import {
   X,
   Upload,
   Loader2,
+  Lock,
 } from 'lucide-react';
 import { employeeAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
@@ -40,8 +41,12 @@ const EmployeeProfile = () => {
     employeeId: '',
     department: '',
     position: '',
-    profilePhoto: '' as {url: string; publicId: string} | string,
+    profilePhoto: '' as string,
     status: 'active',
+    bio: '',
+    reportingTo: '',
+    emergencyContactName: '',
+    emergencyContact: '',
   });
 
   useEffect(() => {
@@ -65,6 +70,10 @@ const EmployeeProfile = () => {
         position: data.position || '',
         profilePhoto: (typeof data.profilePhoto === 'string' ? data.profilePhoto : data.profilePhoto?.url) || '',
         status: data.status || 'active',
+        bio: data.bio || '',
+        reportingTo: data.reportingTo || '',
+        emergencyContactName: data.emergencyContactName || '',
+        emergencyContact: data.emergencyContact || '',
       });
     } catch (error: any) {
       console.error('Failed to fetch profile:', error);
@@ -101,9 +110,10 @@ const EmployeeProfile = () => {
   const handleSave = async () => {
     try {
       const formData = new FormData();
-      Object.keys(profileData).forEach(key => {
-        if (profileData[key as keyof typeof profileData]) {
-          formData.append(key, profileData[key as keyof typeof profileData]);
+      const skipKeys = new Set(['profilePhoto', 'employeeId', 'email']);
+      Object.entries(profileData).forEach(([key, value]) => {
+        if (!skipKeys.has(key) && typeof value === 'string' && value) {
+          formData.append(key, value);
         }
       });
       
@@ -271,20 +281,17 @@ const EmployeeProfile = () => {
               <Separator />
 
               <div className="space-y-2">
-                <Label className="text-muted-foreground">Email Address</Label>
-                {isEditing ? (
-                  <Input
-                    value={profileData.email}
-                    onChange={(e) => handleChange('email', e.target.value)}
-                    className="bg-secondary border-border"
-                    type="email"
-                  />
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <p className="text-foreground">{profileData.email}</p>
-                  </div>
-                )}
+                <div className="flex items-center justify-between">
+                  <Label className="text-muted-foreground">Email Address</Label>
+                  <span className="flex items-center gap-1 text-[11px] text-amber-500 font-medium">
+                    <Lock className="h-3 w-3" />
+                    Managed by HR/Admin
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-secondary/50 border border-border/50">
+                  <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <p className="text-foreground">{profileData.email || '-'}</p>
+                </div>
               </div>
 
               <Separator />

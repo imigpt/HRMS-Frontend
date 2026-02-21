@@ -16,8 +16,12 @@ import {
   Megaphone,
   Loader2,
   User,
+  Star,
   Calendar,
   Edit,
+  MapPin,
+  HouseIcon,
+  IndianRupee,
 } from 'lucide-react';
 import { employeeAPI, attendanceAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
@@ -62,16 +66,12 @@ const EmployeeDashboard = () => {
 
   const handlePunch = async () => {
     try {
+      // Navigate to attendance page which will handle photo/location capture
       if (!isPunchedIn) {
-        await attendanceAPI.checkIn();
-        setIsPunchedIn(true);
-        toast({ title: 'Checked in successfully' });
+        navigate('/employee/attendance?mode=checkin');
       } else {
-        await attendanceAPI.checkOut();
-        setIsPunchedIn(false);
-        toast({ title: 'Checked out successfully' });
+        navigate('/employee/attendance?mode=checkout');
       }
-      fetchDashboard();
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -109,41 +109,90 @@ const EmployeeDashboard = () => {
   const donutData = donutRaw.filter(d => d.value > 0);
   const displayDonut = donutData.length > 0 ? donutData : [{ name: 'No Data', value: 1 }];
 
-  // SVG ring clock
-  const RADIUS = 52;
-  const CIRC = 2 * Math.PI * RADIUS;
-  const workedPercent = Math.min((todayAtt.workedMinutes || 0) / (8 * 60) * 100, 100);
-  const strokeOffset = CIRC - (workedPercent / 100) * CIRC;
-
   const formatDuration = (mins: number) => {
-    if (!mins) return '0 mins';
+    if (!mins || mins <= 0) return '0 mins';
     const h = Math.floor(mins / 60);
     const m = mins % 60;
     return h > 0 ? `${h}h ${m}m` : `${m} mins`;
   };
-
   const workedDisplay = formatDuration(todayAtt.workedMinutes || 0);
   const lateDisplay = formatDuration(todayAtt.lateMinutes || 0);
-
-  const now = new Date();
-  const dateTimeDisplay =
-    now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) +
-    ', ' +
-    now.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
+  const officeHours = todayAtt.officeHours || 8;
+  const workProgress = Math.min(((todayAtt.workedMinutes || 0) / (officeHours * 60)) * 100, 100);
 
   return (
     <DashboardLayout>
       <div className="space-y-6 fade-in">
+
+        {/* ── TOP: Welcome & Check In/Out Section ── */}
+        <Card className="glass-card bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+          <CardContent className="p-6 md:p-8">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+              {/* Left: Greeting */}
+              <div className="flex-1">
+                <h1 className="text-3xl md:text-4xl font-bold text-foreground leading-tight">
+                  Good Morning, {profile.name || 'Employee'}!
+                </h1>
+                <p className="text-muted-foreground mt-2">
+                  {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                </p>
+                
+                {/* Check In Status */}
+                {todayAtt.checkIn && (
+                  <div className="flex items-center gap-2 mt-4 px-3 py-2 rounded-lg bg-emerald-500/10 w-fit">
+                    <CheckCircle className="h-4 w-4 text-emerald-500" />
+                    <span className="text-sm font-medium text-emerald-600">
+                      Checked in at {todayAtt.checkIn}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Right: Check In/Out Button & Location */}
+              <div className="flex flex-col items-start md:items-end gap-4">
+                <Button
+                  onClick={handlePunch}
+                  size="lg"
+                  className={cn(
+                    "glow-button h-14 px-8 text-base font-semibold rounded-xl",
+                    isPunchedIn 
+                      ? 'bg-emerald-500 hover:bg-emerald-600 text-white' 
+                      : 'bg-primary hover:bg-primary/90'
+                  )}
+                >
+                  {isPunchedIn ? (
+                    <>
+                      <Timer className="h-5 w-5 mr-2" />
+                      Check Out
+                    </>
+                  ) : (
+                    <>
+                      <Clock className="h-5 w-5 mr-2" />
+                      Check In
+                    </>
+                  )}
+                </Button>
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <MapPin className="h-4 w-4" />
+                  <span>Location: Office - Main Building</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* ── ROW 1: Profile | Attendance Details | Leave Details ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
           {/* Employee Profile */}
           <Card className="glass-card">
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between mb-5">
+            <CardHeader className="pt-4 px-4 pb-2">
+              <CardTitle className="text-lg font-bold">Employee Profile</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4">
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden flex-shrink-0">
                     {profile.profilePhoto ? (
                       <img src={profile.profilePhoto} alt={profile.name} className="w-full h-full object-cover rounded-full" />
                     ) : (
@@ -151,7 +200,7 @@ const EmployeeDashboard = () => {
                     )}
                   </div>
                   <div>
-                    <p className="font-semibold text-foreground leading-tight">{profile.name || 'Employee'}</p>
+                    <p className="font-bold text-foreground leading-tight">{profile.name || 'Employee'}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {profile.position || 'Employee'}
                       {profile.department && (
@@ -165,7 +214,7 @@ const EmployeeDashboard = () => {
                 </Button>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {[
                   { label: 'Phone Number', value: profile.phone },
                   { label: 'Email', value: profile.email },
@@ -176,7 +225,7 @@ const EmployeeDashboard = () => {
                   },
                 ].map(({ label, value }) => (
                   <div key={label}>
-                    <p className="text-[11px] font-semibold text-primary uppercase tracking-wide">{label}</p>
+                    <p className="text-[11px] font-bold text-primary uppercase tracking-wide">{label}</p>
                     <p className="text-sm text-muted-foreground mt-0.5 truncate">{value || '-'}</p>
                   </div>
                 ))}
@@ -186,10 +235,10 @@ const EmployeeDashboard = () => {
 
           {/* Attendance Details */}
           <Card className="glass-card">
-            <CardHeader className="pt-5 px-5 pb-3">
-              <CardTitle className="text-base">Attendance Details</CardTitle>
+            <CardHeader className="pt-4 px-4 pb-2">
+              <CardTitle className="text-lg font-bold">Attendance Details</CardTitle>
             </CardHeader>
-            <CardContent className="px-5 pb-5">
+            <CardContent className="px-4 pb-4">
               <div className="flex items-center gap-4">
                 {/* Legend */}
                 <div className="flex-1 space-y-2.5">
@@ -232,6 +281,13 @@ const EmployeeDashboard = () => {
                           border: '1px solid var(--border)',
                           borderRadius: '8px',
                           fontSize: '12px',
+                          color: 'var(--foreground)'
+                        }}
+                        itemStyle={{
+                          color: 'var(--foreground)'
+                        }}
+                        labelStyle={{
+                          color: 'var(--muted-foreground)'
                         }}
                       />
                     </PieChart>
@@ -243,22 +299,23 @@ const EmployeeDashboard = () => {
 
           {/* Leave Details */}
           <Card className="glass-card">
-            <CardHeader className="pt-5 px-5 pb-3">
-              <CardTitle className="text-base">Leave Details</CardTitle>
+            <CardHeader className="pt-4 px-4 pb-2">
+              <CardTitle className="text-lg font-bold">Leave Details</CardTitle>
             </CardHeader>
-            <CardContent className="px-5 pb-5">
-              <div className="grid grid-cols-2 gap-x-8 gap-y-4 mb-5">
+            <CardContent className="px-4 pb-4">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3 mb-4">
                 {[
-                  { label: 'Total Leaves', value: leaveStats.total || 0, color: 'text-foreground' },
-                  { label: 'Approved', value: leaveStats.approved || 0, color: 'text-emerald-500' },
-                  { label: 'Rejected', value: leaveStats.rejected || 0, color: 'text-destructive' },
-                  { label: 'Pending', value: leaveStats.pending || 0, color: 'text-amber-500' },
-                  { label: 'Paid Leaves', value: leaveStats.paidLeaves || 0, color: 'text-foreground' },
-                  { label: 'Unpaid Leaves', value: leaveStats.unpaidLeaves || 0, color: 'text-foreground' },
+                  // { label: 'Paid Leave', value: `${leaveStats.paidBalance ?? 0} days`, color: 'text-primary' },
+                  // { label: 'Sick Leave', value: `${leaveStats.sickBalance ?? 0} days`, color: 'text-purple-400' },
+                  // { label: 'Unpaid Leave', value: `${leaveStats.unpaidBalance ?? 0} days`, color: 'text-foreground' },
+                  { label: 'Approved', value: leaveStats.approved ?? 0, color: 'text-emerald-500' },
+                  { label: 'Rejected', value: leaveStats.rejected ?? 0, color: 'text-destructive' },
+                  { label: 'Pending', value: leaveStats.pending ?? 0, color: 'text-amber-500' },
+                  { label: 'Total Applied', value: leaveStats.total ?? 0, color: 'text-foreground' },
                 ].map(({ label, value, color }) => (
                   <div key={label}>
-                    <p className="text-xs text-muted-foreground">{label}</p>
-                    <p className={cn('text-xl font-bold mt-0.5', color)}>{value}</p>
+                    <p className="text-sm text-muted-foreground">{label}</p>
+                    <p className={cn('text-2xl font-bold mt-0.5 tabular-nums', color)}>{value}</p>
                   </div>
                 ))}
               </div>
@@ -269,105 +326,52 @@ const EmployeeDashboard = () => {
           </Card>
         </div>
 
-        {/* ── ROW 2: Attendance Clock + 4 Stats ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-
-          {/* Attendance Clock */}
-          <Card className="glass-card col-span-2 sm:col-span-1 lg:col-span-1">
-            <CardContent className="p-4 flex flex-col items-center text-center">
-              <p className="font-semibold text-sm text-foreground">Attendance</p>
-              <p className="text-[11px] text-muted-foreground mb-3 mt-0.5">{dateTimeDisplay}</p>
-
-              {/* SVG Ring */}
-              <div className="relative mb-3">
-                <svg className="w-[120px] h-[120px] -rotate-90" viewBox="0 0 120 120">
-                  <circle cx="60" cy="60" r={RADIUS} fill="none" stroke="hsl(var(--secondary))" strokeWidth="9" />
-                  <circle
-                    cx="60" cy="60" r={RADIUS}
-                    fill="none"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth="9"
-                    strokeLinecap="round"
-                    strokeDasharray={CIRC}
-                    strokeDashoffset={workedPercent > 0 ? strokeOffset : CIRC}
-                    className="transition-all duration-1000"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-sm font-bold text-foreground">{workedDisplay}</span>
-                </div>
-              </div>
-
-              <p className="text-[11px] text-muted-foreground mb-2">Production: {workedDisplay}</p>
-
-              {todayAtt.checkIn && (
-                <div className="flex items-center gap-1 text-[11px] text-muted-foreground mb-1">
-                  <Clock className="h-3 w-3" />
-                  <span>Clock In Time {todayAtt.checkIn}</span>
-                </div>
-              )}
-
-              {todayAtt.checkOut ? (
-                <Button variant="outline" size="sm" className="w-full text-[11px] h-7 mt-1" disabled>
-                  Clocked Out : {todayAtt.checkOut}
-                </Button>
-              ) : todayAtt.checkIn ? (
-                <Button variant="outline" size="sm" className="w-full text-xs mt-2" onClick={handlePunch}>
-                  <Timer className="h-3 w-3 mr-1" /> Clock Out
-                </Button>
-              ) : (
-                <Button size="sm" className="w-full text-xs mt-2 glow-button" onClick={handlePunch}>
-                  <Clock className="h-3 w-3 mr-1" /> Clock In
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* 4 Mini Stat Cards */}
+        {/* ── ROW 2: 4 Stats ── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: 'Leave Balance', value: stats.leaveBalance ?? 0, icon: CalendarCheck, color: 'bg-primary/20 text-primary' },
+            { label: 'Appreciations', value: stats.appreciationCount ?? stats.appreciations ?? 0, icon: Star, color: 'bg-amber-500/20 text-amber-400' },
             { label: 'Active Tasks', value: stats.activeTasks ?? 0, icon: ClipboardList, color: 'bg-purple-500/20 text-purple-400' },
-            { label: 'Expenses', value: stats.expenseCount ?? 0, icon: Receipt, color: 'bg-orange-500/20 text-orange-400' },
-            { label: 'Attendance %', value: `${stats.attendancePercentage ?? 0}%`, icon: CheckCircle, color: 'bg-emerald-500/20 text-emerald-400' },
+            { label: 'Expenses', value: stats.expenseCount ?? 0, icon: IndianRupee, color: 'bg-orange-500/20 text-orange-400' },
+            { label: 'Complaints', value: stats.complaintsCount ?? stats.complaints ?? 0, icon: HouseIcon, color: 'bg-rose-500/20 text-rose-400' },
           ].map(({ label, value, icon: Icon, color }) => (
             <Card key={label} className="glass-card">
-              <CardContent className="p-4 flex flex-col items-center justify-center text-center gap-2 min-h-[130px]">
+              <CardContent className="p-4 flex flex-col items-center justify-center text-center gap-2 min-h-[120px]">
                 <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center', color)}>
                   <Icon className="h-5 w-5" />
                 </div>
-                <p className="text-2xl font-bold text-foreground tabular-nums">{value}</p>
+                <p className="text-3xl font-bold text-foreground tabular-nums">{value}</p>
                 <p className="text-xs text-muted-foreground leading-tight">{label}</p>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        {/* ── ROW 3: Working Hour Details ── */}
+        {/* ── Working Hour Details ── */}
         <Card className="glass-card">
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-5">
-              <h3 className="font-semibold text-foreground">Working Hour Details</h3>
-              <Button variant="outline" size="sm" className="gap-2 text-xs">
+              <h3 className="text-lg font-bold text-foreground">Working Hour Details</h3>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground">
                 <Calendar className="h-3.5 w-3.5" />
                 Today
-              </Button>
+              </div>
             </div>
-            <div className="grid grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-3 gap-4 mb-5">
               {[
-                { dot: 'bg-foreground/70', label: 'Total office time', value: `${todayAtt.officeHours || 8} hrs` },
+                { dot: 'bg-foreground/80', label: 'Total office time', value: `${officeHours} hrs` },
                 { dot: 'bg-emerald-500', label: 'Total worked time', value: workedDisplay },
-                { dot: 'bg-destructive', label: 'Total Late time', value: lateDisplay },
+                { dot: 'bg-destructive', label: 'Total Late working hours', value: lateDisplay },
               ].map(({ dot, label, value }) => (
                 <div key={label}>
-                  <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
-                    <span className={cn('w-2 h-2 rounded-full flex-shrink-0', dot)} />
+                  <p className="text-sm text-muted-foreground mb-1 flex items-center gap-1.5">
+                    <span className={cn('w-2.5 h-2.5 rounded-full flex-shrink-0', dot)} />
                     {label}
                   </p>
-                  <p className="text-2xl font-bold text-foreground tabular-nums">{value}</p>
+                  <p className="text-3xl font-bold text-foreground tabular-nums">{value}</p>
                 </div>
               ))}
             </div>
-            <Progress value={todayAtt.workProgress || 0} className="h-2" />
+            <Progress value={workProgress} className="h-2" />
           </CardContent>
         </Card>
 

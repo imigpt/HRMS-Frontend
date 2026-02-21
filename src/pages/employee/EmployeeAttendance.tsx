@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -211,37 +211,45 @@ const EmployeeAttendance = () => {
   }, []);
 
   const capturePhoto = () => {
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      
-      // Check if video is ready
-      if (video.videoWidth === 0 || video.videoHeight === 0) {
-        toast({
-          title: 'Camera Loading',
-          description: 'Please wait for camera to initialize...',
-          variant: 'default',
-        });
-        return;
+    // Return a promise that resolves with the created File or null
+    return new Promise<File | null>((resolve) => {
+      if (videoRef.current && canvasRef.current) {
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+
+        if (video.videoWidth === 0 || video.videoHeight === 0) {
+          toast({
+            title: 'Camera Loading',
+            description: 'Please wait for camera to initialize...',
+            variant: 'default',
+          });
+          resolve(null);
+          return;
+        }
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(video, 0, 0);
+
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const file = new File([blob], `checkin-${Date.now()}.jpg`, { type: 'image/jpeg' });
+              setCapturedPhotoFile(file);
+              setCapturedPhoto(canvas.toDataURL('image/jpeg'));
+              stopCamera();
+              resolve(file);
+            } else {
+              resolve(null);
+            }
+          }, 'image/jpeg', 0.8);
+          return;
+        }
       }
-      
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(video, 0, 0);
-        
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const file = new File([blob], `checkin-${Date.now()}.jpg`, { type: 'image/jpeg' });
-            setCapturedPhotoFile(file);
-            setCapturedPhoto(canvas.toDataURL('image/jpeg'));
-            stopCamera();
-          }
-        }, 'image/jpeg', 0.8);
-      }
-    }
+      resolve(null);
+    });
   };
 
   const retakePhoto = () => {
@@ -255,11 +263,12 @@ const EmployeeAttendance = () => {
     setShowPhotoPreview(true);
   };
 
-  const handlePunchIn = async () => {
+  const handlePunchIn = async (photoFile?: File | undefined): Promise<boolean> => {
     try {
       setPunchingIn(true);
+
+      // Require location
       let location;
-      
       try {
         location = await getLocation();
         toast({
@@ -269,48 +278,72 @@ const EmployeeAttendance = () => {
       } catch (error) {
         console.error('Location error:', error);
         toast({
-          title: 'Warning',
-          description: 'Could not get location, proceeding without it',
+          title: 'Location Required',
+          description: 'Location permission is required to check in. Please allow location access and try again.',
           variant: 'destructive',
         });
+        setPunchingIn(false);
+        return false;
       }
 
-      // Call API with photo if captured
-      await attendanceAPI.checkIn(location, capturedPhotoFile || undefined);
-      
+      // Require photo
+      const fileToSend = photoFile || capturedPhotoFile;
+      if (!fileToSend) {
+        toast({
+          title: 'Photo Required',
+          description: 'Please capture a photo before checking in.',
+          variant: 'destructive',
+        });
+        setPunchingIn(false);
+        return false;
+      }
+
+      await attendanceAPI.checkIn(location, fileToSend);
+
       toast({
         title: 'Success',
         description: 'Checked in successfully!',
       });
-      
+
       // Reset camera state
       setCapturedPhoto(null);
       setCapturedPhotoFile(null);
-      
+
       await fetchTodayAttendance();
       await fetchMonthAttendance();
+      return true;
     } catch (error: any) {
       toast({
         title: 'Error',
         description: error.response?.data?.message || 'Failed to check in',
         variant: 'destructive',
       });
+      return false;
     } finally {
       setPunchingIn(false);
     }
   };
 
-  const handlePunchOut = async () => {
+  const handlePunchOut = async (): Promise<boolean> => {
     try {
       setPunchingOut(true);
-      
+
+      // Require location for checkout
       let location;
       try {
         location = await getLocation();
+        toast({ title: 'Location captured', description: 'Your check-out location has been recorded' });
       } catch (error) {
         console.error('Location error:', error);
+        toast({
+          title: 'Location Required',
+          description: 'Location permission is required to check out. Please allow location access and try again.',
+          variant: 'destructive',
+        });
+        setPunchingOut(false);
+        return false;
       }
-      
+
       await attendanceAPI.checkOut(location);
       toast({
         title: 'Success',
@@ -318,16 +351,52 @@ const EmployeeAttendance = () => {
       });
       await fetchTodayAttendance();
       await fetchMonthAttendance();
+      return true;
     } catch (error: any) {
       toast({
         title: 'Error',
         description: error.response?.data?.message || 'Failed to check out',
         variant: 'destructive',
       });
+      return false;
     } finally {
       setPunchingOut(false);
     }
   };
+
+  // Auto-flow when navigated from dashboard with mode param
+  const locationObj = useLocation();
+  useEffect(() => {
+    const params = new URLSearchParams(locationObj.search);
+    const mode = params.get('mode');
+
+    if (mode === 'checkin') {
+      (async () => {
+        try {
+          // Open camera but DO NOT auto-capture or auto-submit.
+          // User must manually take the photo and click "Confirm Check In".
+          await startCamera();
+          toast({ title: 'Ready to check in', description: 'Please take a selfie and click Confirm Check In to complete.', });
+        } catch (err) {
+          console.error('Auto check-in init error:', err);
+          toast({ title: 'Error', description: 'Could not open camera. Please allow camera permissions and try again.', variant: 'destructive' });
+        }
+      })();
+    }
+
+    if (mode === 'checkout') {
+      (async () => {
+        try {
+          const ok = await handlePunchOut();
+          if (ok) {
+            navigate('/employee/attendance', { replace: true });
+          }
+        } catch (err) {
+          console.error('Auto check-out error:', err);
+        }
+      })();
+    }
+  }, [locationObj.search]);
   
   // Calculate stats for current month
   const stats = {
@@ -644,7 +713,7 @@ const EmployeeAttendance = () => {
                   <Button 
                     className="glow-button"
                     size="lg"
-                    onClick={handlePunchIn}
+                    onClick={() => handlePunchIn()}
                     disabled={punchingIn}
                   >
                     {punchingIn && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -849,21 +918,22 @@ const EmployeeAttendance = () => {
                       <th className="text-left p-4 text-sm font-semibold text-foreground">Check Out</th>
                       <th className="text-left p-4 text-sm font-semibold text-foreground">Duration</th>
                       <th className="text-left p-4 text-sm font-semibold text-foreground">Photo</th>
-                      <th className="text-left p-4 text-sm font-semibold text-foreground">Location</th>
+                      <th className="text-left p-4 text-sm font-semibold text-foreground">Check In Location</th>
+                      <th className="text-left p-4 text-sm font-semibold text-foreground">Check Out Location</th>
                       <th className="text-left p-4 text-sm font-semibold text-foreground">Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {loading ? (
                       <tr>
-                        <td colSpan={8} className="p-8 text-center">
+                        <td colSpan={9} className="p-8 text-center">
                           <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
                           <p className="text-muted-foreground">Loading attendance records...</p>
                         </td>
                       </tr>
                     ) : monthAttendance.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                        <td colSpan={9} className="p-8 text-center text-muted-foreground">
                           No attendance records found for this month
                         </td>
                       </tr>
@@ -916,6 +986,22 @@ const EmployeeAttendance = () => {
                                 rel="noopener noreferrer"
                                 className="flex items-center gap-1 text-primary hover:text-primary/80 transition-colors"
                                 title="View check-in location on Google Maps"
+                              >
+                                <MapPin className="h-4 w-4" />
+                                <span className="underline">View</span>
+                              </a>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </td>
+                          <td className="p-4 text-sm">
+                            {record.checkOut?.location ? (
+                              <a
+                                href={`https://www.google.com/maps?q=${record.checkOut.location.latitude},${record.checkOut.location.longitude}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-primary hover:text-primary/80 transition-colors"
+                                title="View check-out location on Google Maps"
                               >
                                 <MapPin className="h-4 w-4" />
                                 <span className="underline">View</span>
