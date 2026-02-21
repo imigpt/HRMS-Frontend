@@ -24,6 +24,7 @@ import {
   Award,
   AlertTriangle,
   MessageSquare,
+  IndianRupee,
 } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { employeeAPI, attendanceAPI, leaveAPI, authAPI } from '@/lib/apiClient';
@@ -214,7 +215,32 @@ const EmployeeDashboard = () => {
                 </div>
                 <div className="flex flex-col items-center gap-3">
                   <Button
-                    onClick={() => navigate('/employee/attendance')}
+                    onClick={async () => {
+                      try {
+                        const res = await attendanceAPI.getToday();
+                        const myToday = res.data?.data;
+                        if (myToday && myToday.status === 'on-leave') {
+                          toast({
+                            title: 'Cannot Check In',
+                            description: `You are on leave today (${myToday.leaveType || 'Leave'}). You cannot check in.`,
+                            variant: 'destructive',
+                          });
+                          return;
+                        }
+                        navigate('/employee/attendance');
+                      } catch (err: any) {
+                        if (err.response?.status === 404) {
+                          navigate('/employee/attendance');
+                          return;
+                        }
+                        console.error('Failed to verify today attendance:', err);
+                        toast({
+                          title: 'Error',
+                          description: err.response?.data?.message || 'Unable to verify attendance status',
+                          variant: 'destructive',
+                        });
+                      }
+                    }}
                     size="lg"
                     className={`glow-button h-20 w-40 text-lg font-semibold ${isPunchedIn ? 'bg-success hover:bg-success/90' : ''}`}
                   >
@@ -362,8 +388,8 @@ const EmployeeDashboard = () => {
                   { label: 'Approved',      value: leaveStats.approved,     color: 'text-green-400' },
                   { label: 'Rejected',      value: leaveStats.rejected,     color: 'text-red-400' },
                   { label: 'Pending',       value: leaveStats.pending,      color: 'text-yellow-400' },
-                  { label: 'Paid Leaves',   value: leaveStats.paidLeaves,   color: 'text-blue-400' },
-                  { label: 'Unpaid Leaves', value: leaveStats.unpaidLeaves, color: 'text-orange-400' },
+                  // { label: 'Paid Leaves',   value: leaveStats.paidLeaves,   color: 'text-blue-400' },
+                  // { label: 'Unpaid Leaves', value: leaveStats.unpaidLeaves, color: 'text-orange-400' },
                 ].map(item => (
                   <div key={item.label} className="bg-secondary/40 rounded-lg p-2">
                     <p className="text-[10px] text-muted-foreground">{item.label}</p>
@@ -386,7 +412,7 @@ const EmployeeDashboard = () => {
           {[
             { label: 'Appreciations', icon: Award,         bg: 'bg-purple-500/20', iconColor: 'text-purple-400', value: 0 },
             { label: 'Warnings',      icon: AlertTriangle,  bg: 'bg-yellow-500/20', iconColor: 'text-yellow-400', value: 0 },
-            { label: 'Expenses',      icon: RupeeIcon,       bg: 'bg-blue-500/20',   iconColor: 'text-blue-400',   value: dashboardData?.stats?.pendingExpenses || 0 },
+            { label: 'Expenses',      icon: IndianRupee,       bg: 'bg-blue-500/20',   iconColor: 'text-blue-400',   value: dashboardData?.stats?.pendingExpenses || 0 },
             { label: 'Complaints',    icon: MessageSquare,  bg: 'bg-red-500/20',    iconColor: 'text-red-400',    value: 0 },
           ].map(({ label, icon: Icon, bg, iconColor, value }) => (
             <Card key={label} className="glass-card">

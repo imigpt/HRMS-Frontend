@@ -37,6 +37,11 @@ import {
   CheckCircle,
   XCircle,
   CheckCheck,
+  Wallet,
+  ChevronDown,
+  TrendingUp,
+  Banknote,
+  IndianRupee,
 } from 'lucide-react';
 import aseleaLogo from '@/assets/aselea-logo.png';
 
@@ -44,6 +49,7 @@ interface NavItem {
   title: string;
   href: string;
   icon: LucideIcon;
+  children?: NavItem[];
 }
 
 const adminNavItems: NavItem[] = [
@@ -53,13 +59,21 @@ const adminNavItems: NavItem[] = [
   { title: 'Clients', href: '/admin/clients', icon: UserCheck },
   { title: 'Attendance', href: '/admin/attendance', icon: Clock },
   { title: 'Edit Requests', href: '/admin/attendance-requests', icon: FileEdit },
-  { title: 'Leaves', href: '/admin/leaves', icon: CalendarCheck },
-  { title: 'Leave Management', href: '/admin/leave-management', icon: CalendarCheck },
+  { title: 'Leaves', href: '/admin/leaves', icon: CalendarCheck, children: [
+    { title: 'Leaves', href: '/admin/leaves', icon: CalendarCheck },
+    { title: 'Leave Management', href: '/admin/leave-management', icon: Calendar },
+  ]},
   { title: 'Tasks', href: '/admin/tasks', icon: ClipboardList },
   { title: 'Expenses', href: '/admin/expenses', icon: Receipt },
   { title: 'Chat', href: '/admin/chat', icon: MessageSquare },
   { title: 'Announcements', href: '/admin/announcements', icon: Megaphone },
   { title: 'Company Policies', href: '/admin/policies', icon: FileText },
+  { title: 'Payroll', href: '/admin/payroll', icon: Wallet, children: [
+    { title: 'Pre Payments', href: '/admin/pre-payments', icon: Banknote },
+    { title: 'Increment/Promotion', href: '/admin/increments', icon: TrendingUp },
+    { title: 'Payroll', href: '/admin/payroll', icon: IndianRupee },
+    { title: 'Employee Salaries', href: '/admin/salaries', icon: Wallet },
+  ]},
   { title: 'System Overview', href: '/admin/system', icon: Settings },
 ];
 
@@ -71,12 +85,21 @@ const hrNavItems: NavItem[] = [
   { title: 'My Attendance', href: '/hr/my-attendance', icon: Clock },
   { title: 'Attendance', href: '/hr/attendance', icon: Clock },
   { title: 'Edit Requests', href: '/hr/attendance-requests', icon: FileEdit },
-  { title: 'Leave Requests', href: '/hr/leaves', icon: CalendarCheck },
+  { title: 'Leaves', href: '/hr/leaves', icon: CalendarCheck, children: [
+    { title: 'Employee Leaves', href: '/hr/employee-leaves', icon: Users },
+    { title: 'My Leaves', href: '/hr/leaves', icon: CalendarCheck },
+  ]},
   { title: 'Tasks', href: '/hr/tasks', icon: ClipboardList },
   { title: 'Expenses', href: '/hr/expenses', icon: Receipt },
   { title: 'Chat', href: '/hr/chat', icon: MessageSquare },
   { title: 'Announcements', href: '/hr/announcements', icon: Megaphone },
   { title: 'Company Policies', href: '/hr/policies', icon: FileText },
+  { title: 'Payroll', href: '/hr/payroll', icon: Wallet, children: [
+    { title: 'Pre Payments', href: '/hr/pre-payments', icon: Banknote },
+    { title: 'Increment/Promotion', href: '/hr/increments', icon: TrendingUp },
+    { title: 'Payroll', href: '/hr/payroll', icon: IndianRupee },
+    { title: 'My Salary', href: '/hr/salaries', icon: Wallet },
+  ]},
   { title: 'Holidays', href: '/hr/holidays', icon: CalendarDays },
 ];
 
@@ -89,6 +112,12 @@ const employeeNavItems: NavItem[] = [
   { title: 'Chat', href: '/employee/chat', icon: MessageSquare },
   { title: 'Announcements', href: '/employee/announcements', icon: Megaphone },
   { title: 'Company Policies', href: '/employee/policies', icon: FileText },
+  { title: 'Payroll', href: '/employee/payroll', icon: Wallet, children: [
+    { title: 'Pre Payments', href: '/employee/pre-payments', icon: Banknote },
+    { title: 'Increment/Promotion', href: '/employee/increments', icon: TrendingUp },
+    { title: 'Payroll', href: '/employee/payroll', icon: IndianRupee },
+    { title: 'My Salary', href: '/employee/salaries', icon: Wallet },
+  ]},
 ];
 
 const clientNavItems: NavItem[] = [
@@ -137,6 +166,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
 
   // Use the aggregated notification system
   const { notifications, unreadCount, markAsRead, markAllRead } = useNotifications();
@@ -182,11 +212,6 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       {/* Logo */}
       <div className="p-6 flex items-center gap-3">
         <img src={aseleaLogo} alt="Aselea" className="h-8 w-auto object-contain" />
-        {sidebarOpen && (
-          <span className="text-lg font-semibold text-foreground slide-in-left">
-            Aselea
-          </span>
-        )}
       </div>
 
       <Separator className="bg-sidebar-border" />
@@ -195,6 +220,54 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       <ScrollArea className="flex-1 px-3 py-4">
         <nav className="space-y-1">
           {navItems.map((item) => {
+            if (item.children && item.children.length > 0) {
+              const isExpanded = expandedMenus[item.title] || false;
+              const isChildActive = item.children.some(child => location.pathname === child.href);
+              return (
+                <div key={item.title}>
+                  <button
+                    onClick={() => setExpandedMenus(prev => ({ ...prev, [item.title]: !prev[item.title] }))}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 w-full',
+                      isChildActive
+                        ? 'bg-primary/15 text-primary'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground'
+                    )}
+                  >
+                    <item.icon className={cn('h-5 w-5 flex-shrink-0', isChildActive && 'text-primary')} />
+                    {sidebarOpen && (
+                      <>
+                        <span className="flex-1 text-left">{item.title}</span>
+                        <ChevronDown className={cn('h-4 w-4 transition-transform', isExpanded && 'rotate-180')} />
+                      </>
+                    )}
+                  </button>
+                  {sidebarOpen && isExpanded && (
+                    <div className="ml-4 mt-1 space-y-1 border-l border-sidebar-border pl-3">
+                      {item.children.map((child) => {
+                        const isActive = location.pathname === child.href;
+                        return (
+                          <Link
+                            key={child.href}
+                            to={child.href}
+                            onClick={() => setMobileOpen(false)}
+                            className={cn(
+                              'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200',
+                              isActive
+                                ? 'bg-primary/15 text-primary font-medium'
+                                : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground'
+                            )}
+                          >
+                            <child.icon className={cn('h-4 w-4 flex-shrink-0', isActive && 'text-primary')} />
+                            <span>{child.title}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
             const isActive = location.pathname === item.href;
             return (
               <Link

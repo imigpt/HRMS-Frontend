@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useApi } from '@/hooks/useApi';
-import { leaveAPI, leaveBalanceAPI } from '@/lib/apiClient';
+import { leaveAPI, leaveBalanceAPI, employeeAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
 
 interface LeaveRequest {
@@ -92,9 +92,17 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
 
   const fetchLeaves = async () => {
     try {
-      const result = await execute(() => leaveAPI.getLeaves());
-      if (result?.data) {
-        setLeaveRequests(result.data);
+      let result: any;
+      // For HR role, show only HR user's own leaves
+      if (role === 'hr') {
+        result = await execute(() => employeeAPI.getMyLeaves());
+        const data = result?.data?.data ?? result?.data ?? [];
+        setLeaveRequests(Array.isArray(data) ? data : []);
+      } else {
+        // Admin and employee see the standard leaves endpoint
+        result = await execute(() => leaveAPI.getLeaves());
+        const data = result?.data ?? result;
+        setLeaveRequests(Array.isArray(data) ? data : []);
       }
     } catch (error: any) {
       toast({
@@ -205,7 +213,7 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
     return request.status === filter;
   });
 
-  const canApprove = role === 'hr' || role === 'admin';
+  const canApprove = role === 'admin';
   const canApply = role === 'employee' || role === 'hr';
 
   return (

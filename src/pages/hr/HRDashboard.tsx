@@ -29,14 +29,21 @@ import {
   Loader2,
   FileText,
   ExternalLink,
+  Phone,
+  Mail,
+  Building2,
+  Users,
+  AlertTriangle,
+  TrendingUp,
 } from 'lucide-react';
-import { hrAPI, leaveAPI, expenseAPI } from '@/lib/apiClient';
+import { hrAPI, leaveAPI, expenseAPI, attendanceAPI, employeeAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
 
 const HRDashboard = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState<any>(null);
+  const [hrProfileData, setHrProfileData] = useState<any>(null);
   const [pendingLeaves, setPendingLeaves] = useState<any[]>([]);
   const [pendingExpenses, setPendingExpenses] = useState<any[]>([]);
   const [todayAttendance, setTodayAttendance] = useState<any>({ attendance: [], absent: [], stats: {} });
@@ -61,7 +68,24 @@ const HRDashboard = () => {
         hrAPI.getTodayAttendance(),
       ]);
       setDashboardData(dashboardRes.data.data);
-      setPendingLeaves(Array.isArray(leavesRes.data.data) ? leavesRes.data.data : []);
+
+      // Fetch full HR profile so phone/email/photo/position are available
+      try {
+        const profileRes = await hrAPI.getProfile();
+        setHrProfileData(profileRes.data?.user || dashboardRes.data.data?.user || null);
+      } catch {
+        setHrProfileData(dashboardRes.data.data?.user || null);
+      }
+
+      // Load only HR user's own leaves for this section
+      let myLeaves: any[] = [];
+      try {
+        const myRes = await employeeAPI.getMyLeaves();
+        myLeaves = Array.isArray(myRes.data?.data) ? myRes.data.data : [];
+      } catch (e) {
+        myLeaves = [];
+      }
+      setPendingLeaves(myLeaves);
       setPendingExpenses(Array.isArray(expensesRes.data.data) ? expensesRes.data.data : []);
       // Handle nested attendance data structure
       const attendanceData = attendanceRes.data.data;
@@ -211,86 +235,227 @@ const HRDashboard = () => {
       </DashboardLayout>
     );
   }
+
   return (
     <DashboardLayout>
       <div className="space-y-6 fade-in">
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatsCard
-            title="Total Employees"
-            value={dashboardData?.stats?.totalEmployees || 0}
-            icon={UserCircle}
-            className="stagger-1"
-          />
-          <StatsCard
-            title="Present Today"
-            value={dashboardData?.stats?.presentToday || 0}
-            icon={Clock}
-            suffix={`/${dashboardData?.stats?.totalEmployees || 0}`}
-            className="stagger-2"
-          />
-          <StatsCard
-            title="Pending Leaves"
-            value={dashboardData?.stats?.pendingLeaves || 0}
-            icon={CalendarCheck}
-            className="stagger-3"
-          />
-          <StatsCard
-            title="Active Tasks"
-            value={dashboardData?.stats?.activeTasks || 0}
-            icon={ClipboardList}
-            className="stagger-4"
-          />
-        </div>
-
-        {/* Quick Actions */}
+        {/* ── Greeting Card ────────────────────────────────────────────────────── */}
         <Card className="glass-card">
-          <CardHeader>
-            <CardTitle className="text-base">Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-3">
-              <Button 
-                className="glow-button"
-                onClick={() => navigate('/hr/employees')}
-              >
-                <UserPlus className="h-4 w-4 mr-2" />
-                Add Employee
-              </Button>
-              <Button 
-                variant="secondary"
-                onClick={() => navigate('/hr/tasks')}
-              >
-                <ClipboardList className="h-4 w-4 mr-2" />
-                Create Task
-              </Button>
-              <Button 
-                variant="secondary"
-                onClick={() => navigate('/hr/holidays')}
-              >
-                <CalendarCheck className="h-4 w-4 mr-2" />
-                Add Holiday
-              </Button>
-              <Button 
-                variant="secondary"
-                onClick={() => navigate('/hr/expenses')}
-              >
-                <Receipt className="h-4 w-4 mr-2" />
-                Review Expenses
-              </Button>
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+              <div>
+                <h2 className="text-3xl font-bold text-foreground mb-2">
+                  Good Morning, {hrProfileData?.name || 'HR Manager'}!
+                </h2>
+                <p className="text-muted-foreground">
+                  {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {/* You have {pendingLeaves.length} pending leave requests and {pendingExpenses.length} expense claims to review. */}
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  onClick={async () => {
+                    try {
+                      const res = await attendanceAPI.getToday();
+                      const myToday = res.data?.data;
+                      if (myToday && myToday.status === 'on-leave') {
+                        toast({
+                          title: 'Cannot Check In',
+                          description: `You are on leave today (${myToday.leaveType || 'Leave'}). You cannot check in.`,
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
+                      navigate('/hr/my-attendance');
+                    } catch (err: any) {
+                      // If there's no record for today (404), allow navigation to check in page
+                      if (err.response?.status === 404) {
+                        navigate('/hr/my-attendance');
+                        return;
+                      }
+                      console.error('Failed to verify today attendance:', err);
+                      toast({
+                        title: 'Error',
+                        description: err.response?.data?.message || 'Unable to verify attendance status',
+                        variant: 'destructive',
+                      });
+                    }
+                  }}
+                  size="lg"
+                  className="glow-button h-20 w-40 text-lg font-semibold"
+                >
+                  <Clock className="h-5 w-5 mr-2" />
+                  Check In
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Pending Leave Requests */}
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CalendarCheck className="h-5 w-5 text-primary" />
-                Pending Leave Requests
+        {/* ── Row 1: HR Profile | Attendance Stats | Pending Approvals ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* HR Profile Card */}
+          <Card className="glass-card min-h-[260px]">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  {hrProfileData?.profilePhoto?.url ? (
+                    <img src={hrProfileData.profilePhoto.url} alt="HR avatar" className="w-12 h-12 rounded-full object-cover" />
+                  ) : (
+                    <UserCircle className="w-7 h-7 text-primary" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-foreground truncate text-2xl">{hrProfileData?.name || 'HR Manager'}</p>
+                  <p className="text-sm text-muted-foreground truncate">
+                    {hrProfileData?.position || 'HR Manager'} • {hrProfileData?.department || 'HR'}
+                  </p>
+                  <Badge variant="outline" className="text-sm mt-0.5 status-approved capitalize">
+                    {hrProfileData?.status || 'active'}
+                  </Badge>
+                </div>
+              </div>
+              <div className="space-y-3 text-lg">
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <Phone className="h-4 w-4 flex-shrink-0 text-primary/70" />
+                  <span className="truncate">{hrProfileData?.phone || '—'}</span>
+                </div>
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <Mail className="h-4 w-4 flex-shrink-0 text-primary/70" />
+                  <span className="truncate">{hrProfileData?.email || '—'}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* HR Stats */}
+          <Card className="glass-card min-h-[260px]">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-primary" />
+                HR Overview
               </CardTitle>
-              <CardDescription>Requests awaiting your approval</CardDescription>
+              <CardDescription>Organization snapshot</CardDescription>
+            </CardHeader>
+            <CardContent className="p-5 pt-0">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center p-2 rounded bg-secondary/30">
+                  <span className="text-sm font-medium">Total Employees</span>
+                  <span className="text-2xl font-bold text-primary">{dashboardData?.stats?.totalEmployees || 0}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 rounded bg-secondary/30">
+                  <span className="text-sm font-medium">Present Today</span>
+                  <span className="text-2xl font-bold text-success">{todayAttendance?.stats?.present || 0}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 rounded bg-secondary/30">
+                  <span className="text-sm font-medium">On Leave</span>
+                  <span className="text-2xl font-bold text-warning">{todayAttendance?.stats?.onLeave || 0}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 rounded bg-secondary/30">
+                  <span className="text-sm font-medium">Absent</span>
+                  <span className="text-2xl font-bold text-destructive">{todayAttendance?.stats?.absent || 0}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Pending Approvals */}
+          <Card className="glass-card min-h-[260px]">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-primary" />
+                Pending Approvals
+              </CardTitle>
+              <CardDescription>Items awaiting review</CardDescription>
+            </CardHeader>
+            <CardContent className="p-5 pt-0">
+              <div className="space-y-4">
+                <div className="p-3 rounded bg-secondary/30">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Leave Requests</span>
+                    <Badge className="bg-warning text-black">{pendingLeaves.length}</Badge>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="mt-2 w-full text-xs"
+                    onClick={() => navigate('/hr/leaves')}
+                  >
+                    View All
+                  </Button>
+                </div>
+                <div className="p-3 rounded bg-secondary/30">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Expense Claims</span>
+                    <Badge className="bg-warning text-black">{pendingExpenses.length}</Badge>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="mt-2 w-full text-xs"
+                    onClick={() => navigate('/hr/expenses')}
+                  >
+                    View All
+                  </Button>
+                </div>
+                <div className="p-3 rounded bg-secondary/30">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Active Tasks</span>
+                    <Badge className="bg-primary">{dashboardData?.stats?.activeTasks || 0}</Badge>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="mt-2 w-full text-xs"
+                    onClick={() => navigate('/hr/tasks')}
+                  >
+                    View All
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ── Row 2: 4 Stat Cards ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatsCard
+            title="Employees on Leave"
+            value={todayAttendance?.stats?.onLeave || 0}
+            icon={CalendarCheck}
+            className="stagger-1"
+          />
+          <StatsCard
+            title="Pending Approvals"
+            value={(pendingLeaves.length || 0) + (pendingExpenses.length || 0)}
+            icon={ClipboardList}
+            className="stagger-2"
+          />
+          <StatsCard
+            title="Active Tasks"
+            value={dashboardData?.stats?.activeTasks || 0}
+            icon={TrendingUp}
+            className="stagger-3"
+          />
+          <StatsCard
+            title="Total Departments"
+            value={dashboardData?.stats?.totalDepartments || 0}
+            icon={Building2}
+            className="stagger-4"
+          />
+        </div>
+
+        {/* ── Row 3: Pending Leaves & Expenses (2-column) ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="glass-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <CalendarCheck className="h-5 w-5 text-primary" />
+                My Leave Requests
+              </CardTitle>
+              <CardDescription>Your leave requests</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -316,24 +481,29 @@ const HRDashboard = () => {
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        className="text-success hover:text-success hover:bg-success/10"
-                        onClick={() => handleApproveLeave(leave._id)}
-                        disabled={actionLoading}
-                      >
-                        <CheckCircle className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => openRejectDialog(leave._id)}
-                        disabled={actionLoading}
-                      >
-                        <XCircle className="h-4 w-4" />
-                      </Button>
+                      {/* Approve/reject are not shown for HR's own leaves */}
+                      {leave.user?._id !== hrProfileData?._id && leave.user && (
+                        <>
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className="text-success hover:text-success hover:bg-success/10"
+                            onClick={() => handleApproveLeave(leave._id)}
+                            disabled={actionLoading}
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => openRejectDialog(leave._id)}
+                            disabled={actionLoading}
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                   );
@@ -344,8 +514,8 @@ const HRDashboard = () => {
 
           {/* Pending Expenses */}
           <Card className="glass-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
                 <Receipt className="h-5 w-5 text-primary" />
                 Pending Expenses
               </CardTitle>
@@ -425,84 +595,7 @@ const HRDashboard = () => {
           </Card>
         </div>
 
-        {/* Today's Attendance */}
-        <Card className="glass-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-primary" />
-              Today's Attendance
-            </CardTitle>
-            <CardDescription>Real-time attendance status</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {todayAttendance?.attendance && todayAttendance.attendance.length > 0 ? (
-                todayAttendance.attendance.map((record: any) => {
-                  const userName = record.user?.name || 'Unknown';
-                  const checkInTime = record.checkIn ? new Date(record.checkIn).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:--';
-                  const checkOutTime = record.checkOut ? new Date(record.checkOut).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:--';
-                  
-                  return (
-                  <div
-                    key={record._id}
-                    className="p-4 rounded-lg bg-secondary/50 border border-border"
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback className="bg-primary/20 text-primary text-sm">
-                          {userName.split(' ').map(n => n[0]).join('')}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{userName}</p>
-                        <Badge
-                          variant="outline"
-                          className={
-                            record.status === 'present' ? 'status-approved' :
-                            record.status === 'late' ? 'status-pending' : 'status-rejected'
-                          }
-                        >
-                          {record.status}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>In: {checkInTime}</span>
-                      <span>Out: {checkOutTime}</span>
-                    </div>
-                  </div>
-                  );
-                })
-              ) : (
-                <div className="col-span-full text-center py-8 text-muted-foreground">
-                  No attendance records for today
-                </div>
-              )}
-            </div>
-
-            {/* Attendance Summary */}
-            <div className="mt-6 p-4 rounded-lg bg-secondary/30 border border-border">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                <div>
-                  <p className="text-2xl font-bold text-success">{todayAttendance?.stats?.present || 0}</p>
-                  <p className="text-xs text-muted-foreground">Present</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-warning">{todayAttendance?.stats?.late || 0}</p>
-                  <p className="text-xs text-muted-foreground">Late</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-destructive">{todayAttendance?.stats?.absent || 0}</p>
-                  <p className="text-xs text-muted-foreground">Absent</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-primary">{todayAttendance?.stats?.onLeave || 0}</p>
-                  <p className="text-xs text-muted-foreground">On Leave</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Today's Attendance removed per request */}
       </div>
 
       {/* Reject Leave Dialog */}

@@ -287,6 +287,39 @@ export const policyAPI = {
     api.get(`/policies/${id}/download`, { responseType: 'blob' }),
 };
 
+// Payroll APIs
+export const payrollAPI = {
+  // Employee Salaries
+  getSalaries: (params?: any) => api.get('/payroll/salaries', { params }),
+  getMySalary: () => api.get('/payroll/salaries/me'),
+  getSalaryById: (id: string) => api.get(`/payroll/salaries/${id}`),
+  createSalary: (data: any) => api.post('/payroll/salaries', data),
+  updateSalary: (id: string, data: any) => api.put(`/payroll/salaries/${id}`, data),
+  deleteSalary: (id: string) => api.delete(`/payroll/salaries/${id}`),
+
+  // Pre-Payments
+  getPrePayments: (params?: any) => api.get('/payroll/pre-payments', { params }),
+  getPrePaymentById: (id: string) => api.get(`/payroll/pre-payments/${id}`),
+  createPrePayment: (data: any) => api.post('/payroll/pre-payments', data),
+  updatePrePayment: (id: string, data: any) => api.put(`/payroll/pre-payments/${id}`, data),
+  deletePrePayment: (id: string) => api.delete(`/payroll/pre-payments/${id}`),
+
+  // Increment/Promotion
+  getIncrements: (params?: any) => api.get('/payroll/increments', { params }),
+  getIncrementById: (id: string) => api.get(`/payroll/increments/${id}`),
+  createIncrement: (data: any) => api.post('/payroll/increments', data),
+  updateIncrement: (id: string, data: any) => api.put(`/payroll/increments/${id}`, data),
+  deleteIncrement: (id: string) => api.delete(`/payroll/increments/${id}`),
+
+  // Payroll
+  getPayrolls: (params?: any) => api.get('/payroll', { params }),
+  getMyPayrolls: (params?: any) => api.get('/payroll/my-payrolls', { params }),
+  getPayrollById: (id: string) => api.get(`/payroll/${id}`),
+  generatePayroll: (data: any) => api.post('/payroll/generate', data),
+  updatePayroll: (id: string, data: any) => api.put(`/payroll/${id}`, data),
+  deletePayroll: (id: string) => api.delete(`/payroll/${id}`),
+};
+
 // User APIs
 export const userAPI = {
   getUsers: (params?: any) => api.get('/user', { params }),
@@ -310,4 +343,5 @@ export default {
   announcement: announcementAPI,
   user: userAPI,
   policy: policyAPI,
+  payroll: payrollAPI,
 };
