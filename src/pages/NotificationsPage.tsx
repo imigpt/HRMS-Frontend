@@ -18,6 +18,9 @@ import {
   CalendarCheck,
   Receipt,
   FileEdit,
+  ClipboardList,
+  Star,
+  TrendingUp,
 } from 'lucide-react';
 import { useNotifications, AppNotification, NotificationType } from '@/contexts/NotificationContext';
 
@@ -91,9 +94,27 @@ const typeConfig: Record<
     color: 'text-warning',
     badgeClass: 'bg-warning/20 text-warning border-warning/30',
   },
+  task_assigned: {
+    label: 'Task Assigned',
+    icon: <ClipboardList className="h-4 w-4" />,
+    color: 'text-orange-400',
+    badgeClass: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+  },
+  task_progress: {
+    label: 'Task Progress',
+    icon: <TrendingUp className="h-4 w-4" />,
+    color: 'text-blue-400',
+    badgeClass: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+  },
+  task_reviewed: {
+    label: 'Task Reviewed',
+    icon: <Star className="h-4 w-4" />,
+    color: 'text-yellow-400',
+    badgeClass: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+  },
 };
 
-type FilterType = 'all' | 'unread' | NotificationType;
+type FilterType = 'all' | 'unread' | 'task' | 'leave' | 'expense' | 'attendance' | NotificationType;
 
 const NotificationsPage = () => {
   const navigate = useNavigate();
@@ -104,7 +125,11 @@ const NotificationsPage = () => {
   const filtered = notifications.filter((n) => {
     if (filter === 'all') return true;
     if (filter === 'unread') return !n.read;
-    return n.type === filter;
+    if (filter === 'task') return n.type.startsWith('task_');
+    if (filter === 'leave') return n.type.startsWith('leave_');
+    if (filter === 'expense') return n.type.startsWith('expense_');
+    if (filter === 'attendance') return n.type.startsWith('attendance_');
+    return n.type === (filter as NotificationType);
   });
 
   const handleNotificationClick = (n: AppNotification) => {
@@ -117,9 +142,10 @@ const NotificationsPage = () => {
     { key: 'unread', label: `Unread (${unreadCount})` },
     { key: 'announcement', label: 'Announcements' },
     { key: 'chat', label: 'Chat' },
-    { key: 'leave_approved', label: 'Leave' },
-    { key: 'expense_approved', label: 'Expenses' },
-    { key: 'attendance_edit_approved', label: 'Attendance' },
+    { key: 'leave', label: 'Leaves' },
+    { key: 'expense', label: 'Expenses' },
+    { key: 'attendance', label: 'Attendance' },
+    { key: 'task', label: 'Tasks' },
   ];
 
   return (
@@ -151,7 +177,7 @@ const NotificationsPage = () => {
         </div>
 
         {/* Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <Card className="glass-card">
             <CardContent className="p-4 flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
@@ -200,6 +226,19 @@ const NotificationsPage = () => {
               </div>
             </CardContent>
           </Card>
+          <Card className="glass-card">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center">
+                <ClipboardList className="h-5 w-5 text-orange-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">
+                  {notifications.filter((n) => n.type.startsWith('task_')).length}
+                </p>
+                <p className="text-xs text-muted-foreground">Tasks</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Filter Tabs */}
@@ -224,6 +263,14 @@ const NotificationsPage = () => {
                 ? 'All Notifications'
                 : filter === 'unread'
                 ? 'Unread Notifications'
+                : filter === 'task'
+                ? 'Task Notifications'
+                : filter === 'leave'
+                ? 'Leave Notifications'
+                : filter === 'expense'
+                ? 'Expense Notifications'
+                : filter === 'attendance'
+                ? 'Attendance Notifications'
                 : typeConfig[filter as NotificationType]?.label || 'Notifications'}
               <span className="ml-2 text-sm text-muted-foreground font-normal">
                 ({filtered.length})

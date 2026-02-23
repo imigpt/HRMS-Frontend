@@ -277,7 +277,8 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
       } catch { /* silent */ }
     }
 
-    // ── 7. Task notifications ─────────────────────────────────────────────
+    // ── 7. Task notifications (employee / hr / admin only) ─────────────────
+    if (userRole !== 'client') {
     const taskLink = userRole === 'admin' ? '/admin/tasks' : userRole === 'hr' ? '/hr/tasks' : '/employee/tasks';
     try {
       const res = await taskAPI.getTasks();
@@ -329,6 +330,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
         });
       }
     } catch { /* silent */ }
+    } // end userRole !== 'client'
 
     // Sort newest first
     result.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());

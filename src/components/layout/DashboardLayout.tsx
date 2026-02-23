@@ -130,6 +130,7 @@ const employeeNavItems: NavItem[] = [
 const clientNavItems: NavItem[] = [
   { title: 'Dashboard', href: '/client', icon: LayoutDashboard },
   { title: 'Chat', href: '/client/chat', icon: MessageSquare },
+  { title: 'Notifications', href: '/client/notifications', icon: Bell },
 ];
 
 const getNavItems = (role: UserRole): NavItem[] => {
