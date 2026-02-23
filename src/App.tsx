@@ -42,12 +42,18 @@ import PrePaymentsModule from "./components/modules/PrePaymentsModule";
 import IncrementModule from "./components/modules/IncrementModule";
 import PayrollModule from "./components/modules/PayrollModule";
 import EmployeeSalariesModule from "./components/modules/EmployeeSalariesModule";
+import AdminSettings from "./pages/admin/AdminSettings";
+import HRSettings from "./pages/hr/HRSettings";
+import EmployeeSettings from "./pages/employee/EmployeeSettings";
+import ForgotPassword from "./pages/ForgotPassword";
+import { PermissionProvider } from "./contexts/PermissionContext";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
+      <PermissionProvider>
       <NotificationProvider>
         <TooltipProvider>
           <Toaster />
@@ -57,6 +63,7 @@ const App = () => (
               {/* Auth Routes */}
               <Route path="/" element={<Navigate to="/login" replace />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
 
             {/* Admin Routes - Protected */}
             <Route path="/admin" element={<ProtectedRoute allowedRole="admin"><AdminDashboard /></ProtectedRoute>} />
@@ -80,6 +87,7 @@ const App = () => (
             <Route path="/admin/increments" element={<ProtectedRoute allowedRole="admin"><IncrementModule role="admin" /></ProtectedRoute>} />
             <Route path="/admin/payroll" element={<ProtectedRoute allowedRole="admin"><PayrollModule role="admin" /></ProtectedRoute>} />
             <Route path="/admin/salaries" element={<ProtectedRoute allowedRole="admin"><EmployeeSalariesModule role="admin" /></ProtectedRoute>} />
+            <Route path="/admin/settings" element={<ProtectedRoute allowedRole="admin"><AdminSettings /></ProtectedRoute>} />
             <Route path="/admin/*" element={<ProtectedRoute allowedRole="admin"><AdminDashboard /></ProtectedRoute>} />
 
             {/* HR Routes - Protected */}
@@ -103,6 +111,7 @@ const App = () => (
             <Route path="/hr/increments" element={<ProtectedRoute allowedRole="hr"><IncrementModule role="hr" /></ProtectedRoute>} />
             <Route path="/hr/payroll" element={<ProtectedRoute allowedRole="hr"><PayrollModule role="hr" /></ProtectedRoute>} />
             <Route path="/hr/salaries" element={<ProtectedRoute allowedRole="hr"><EmployeeSalariesModule role="hr" /></ProtectedRoute>} />
+            <Route path="/hr/settings" element={<ProtectedRoute allowedRole="hr"><HRSettings /></ProtectedRoute>} />
             <Route path="/hr/*" element={<ProtectedRoute allowedRole="hr"><HRDashboard /></ProtectedRoute>} />
 
             {/* Employee Routes - Protected */}
@@ -121,6 +130,7 @@ const App = () => (
             <Route path="/employee/increments" element={<ProtectedRoute allowedRole="employee"><IncrementModule role="employee" /></ProtectedRoute>} />
             <Route path="/employee/payroll" element={<ProtectedRoute allowedRole="employee"><PayrollModule role="employee" /></ProtectedRoute>} />
             <Route path="/employee/salaries" element={<ProtectedRoute allowedRole="employee"><EmployeeSalariesModule role="employee" /></ProtectedRoute>} />
+            <Route path="/employee/settings" element={<ProtectedRoute allowedRole="employee"><EmployeeSettings /></ProtectedRoute>} />
             <Route path="/employee/*" element={<ProtectedRoute allowedRole="employee"><EmployeeDashboard /></ProtectedRoute>} />
 
             {/* Client Routes - Protected */}
@@ -135,6 +145,7 @@ const App = () => (
         </BrowserRouter>
       </TooltipProvider>
     </NotificationProvider>
+  </PermissionProvider>
   </AuthProvider>
 </QueryClientProvider>
 );

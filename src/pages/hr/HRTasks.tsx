@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { hrAPI, taskAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
+import DocumentViewer from '@/components/ui/DocumentViewer';
 
 interface TaskAttachment {
   _id?: string;
@@ -71,6 +72,8 @@ interface Task {
 
 const HRTasks = () => {
   const { toast } = useToast();
+  // Document viewer
+  const [viewerDoc, setViewerDoc] = useState<{ url: string; name: string } | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -476,8 +479,8 @@ const HRTasks = () => {
                               <div className="flex gap-1">
                                 {attachment.url && attachment.url !== '#' && (
                                   <>
-                                    <Button variant="ghost" size="sm" onClick={() => window.open(attachment.url, '_blank')}><Eye className="h-4 w-4" /></Button>
-                                    <Button variant="ghost" size="sm" onClick={() => handleDownload(attachment.url, attachment.name)}><Download className="h-4 w-4" /></Button>
+                                    <Button variant="ghost" size="sm" title="View" onClick={() => setViewerDoc({ url: attachment.url, name: attachment.name })}><Eye className="h-4 w-4" /></Button>
+                                    <Button variant="ghost" size="sm" title="Download" onClick={() => handleDownload(attachment.url, attachment.name)}><Download className="h-4 w-4" /></Button>
                                   </>
                                 )}
                               </div>
@@ -569,6 +572,16 @@ const HRTasks = () => {
           </DialogContent>
         </Dialog>
       </div>
+      )}
+
+      {/* ── Document Viewer ── */}
+      {viewerDoc && (
+        <DocumentViewer
+          open={!!viewerDoc}
+          onClose={() => setViewerDoc(null)}
+          url={viewerDoc.url}
+          fileName={viewerDoc.name}
+        />
       )}
     </DashboardLayout>
   );

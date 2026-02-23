@@ -1,6 +1,7 @@
-import { ReactNode, useState, useEffect } from 'react';
+import { ReactNode, useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, UserRole } from '@/contexts/AuthContext';
+import { usePermissions } from '@/contexts/PermissionContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -50,6 +51,8 @@ interface NavItem {
   href: string;
   icon: LucideIcon;
   children?: NavItem[];
+  /** Module name from Role permissions — used to filter visibility */
+  module?: string;
 }
 
 const adminNavItems: NavItem[] = [
@@ -74,50 +77,54 @@ const adminNavItems: NavItem[] = [
     { title: 'Payroll', href: '/admin/payroll', icon: IndianRupee },
     { title: 'Employee Salaries', href: '/admin/salaries', icon: Wallet },
   ]},
-  { title: 'System Overview', href: '/admin/system', icon: Settings },
+  { title: 'Settings', href: '/admin/settings', icon: Settings },
 ];
 
 const hrNavItems: NavItem[] = [
-  { title: 'Dashboard', href: '/hr', icon: LayoutDashboard },
+  { title: 'Dashboard', href: '/hr', icon: LayoutDashboard, module: 'dashboard' },
   { title: 'My Profile', href: '/hr/profile', icon: User },
-  { title: 'Employees', href: '/hr/employees', icon: UserCircle },
-  { title: 'Clients', href: '/hr/clients', icon: UserCheck },
-  { title: 'My Attendance', href: '/hr/my-attendance', icon: Clock },
-  { title: 'Attendance', href: '/hr/attendance', icon: Clock },
-  { title: 'Edit Requests', href: '/hr/attendance-requests', icon: FileEdit },
-  { title: 'Leaves', href: '/hr/leaves', icon: CalendarCheck, children: [
-    { title: 'Employee Leaves', href: '/hr/employee-leaves', icon: Users },
-    { title: 'My Leaves', href: '/hr/leaves', icon: CalendarCheck },
+  { title: 'Employees', href: '/hr/employees', icon: UserCircle, module: 'employees' },
+  { title: 'Clients', href: '/hr/clients', icon: UserCheck, module: 'clients' },
+  { title: 'Attendance', href: '/hr/attendance', icon: Clock, module: 'attendance', children: [
+    { title: 'Attendance', href: '/hr/attendance', icon: Clock, module: 'attendance' },
+    { title: 'My Attendance', href: '/hr/my-attendance', icon: Clock, module: 'attendance' },
+    { title: 'Edit Requests', href: '/hr/attendance-requests', icon: FileEdit, module: 'attendance' },
   ]},
-  { title: 'Tasks', href: '/hr/tasks', icon: ClipboardList },
-  { title: 'Expenses', href: '/hr/expenses', icon: Receipt },
-  { title: 'Chat', href: '/hr/chat', icon: MessageSquare },
-  { title: 'Announcements', href: '/hr/announcements', icon: Megaphone },
-  { title: 'Company Policies', href: '/hr/policies', icon: FileText },
-  { title: 'Payroll', href: '/hr/payroll', icon: Wallet, children: [
-    { title: 'Pre Payments', href: '/hr/pre-payments', icon: Banknote },
-    { title: 'Increment/Promotion', href: '/hr/increments', icon: TrendingUp },
-    { title: 'Payroll', href: '/hr/payroll', icon: IndianRupee },
-    { title: 'My Salary', href: '/hr/salaries', icon: Wallet },
+  { title: 'Leaves', href: '/hr/leaves', icon: CalendarCheck, module: 'leaves', children: [
+    { title: 'Employee Leaves', href: '/hr/employee-leaves', icon: Users, module: 'leaves' },
+    { title: 'My Leaves', href: '/hr/leaves', icon: CalendarCheck, module: 'leaves' },
+  ]},
+  { title: 'Tasks', href: '/hr/tasks', icon: ClipboardList, module: 'tasks' },
+  { title: 'Expenses', href: '/hr/expenses', icon: Receipt, module: 'expenses' },
+  { title: 'Chat', href: '/hr/chat', icon: MessageSquare, module: 'chat' },
+  { title: 'Announcements', href: '/hr/announcements', icon: Megaphone, module: 'announcements' },
+  { title: 'Company Policies', href: '/hr/policies', icon: FileText, module: 'policies' },
+  { title: 'Payroll', href: '/hr/payroll', icon: Wallet, module: 'payroll', children: [
+    { title: 'Pre Payments', href: '/hr/pre-payments', icon: Banknote, module: 'payroll' },
+    { title: 'Increment/Promotion', href: '/hr/increments', icon: TrendingUp, module: 'payroll' },
+    { title: 'Payroll', href: '/hr/payroll', icon: IndianRupee, module: 'payroll' },
+    { title: 'My Salary', href: '/hr/salaries', icon: Wallet, module: 'payroll' },
   ]},
   { title: 'Holidays', href: '/hr/holidays', icon: CalendarDays },
+  { title: 'Settings', href: '/hr/settings', icon: Settings },
 ];
 
 const employeeNavItems: NavItem[] = [
-  { title: 'Dashboard', href: '/employee', icon: LayoutDashboard },
+  { title: 'Dashboard', href: '/employee', icon: LayoutDashboard, module: 'dashboard' },
   { title: 'My Profile', href: '/employee/profile', icon: UserCircle },
-  { title: 'Attendance', href: '/employee/attendance', icon: Clock },
-  { title: 'Tasks', href: '/employee/tasks', icon: ClipboardList },
-  { title: 'Expenses', href: '/employee/expenses', icon: Receipt },
-  { title: 'Chat', href: '/employee/chat', icon: MessageSquare },
-  { title: 'Announcements', href: '/employee/announcements', icon: Megaphone },
-  { title: 'Company Policies', href: '/employee/policies', icon: FileText },
-  { title: 'Payroll', href: '/employee/payroll', icon: Wallet, children: [
-    { title: 'Pre Payments', href: '/employee/pre-payments', icon: Banknote },
-    { title: 'Increment/Promotion', href: '/employee/increments', icon: TrendingUp },
-    { title: 'Payroll', href: '/employee/payroll', icon: IndianRupee },
-    { title: 'My Salary', href: '/employee/salaries', icon: Wallet },
+  { title: 'Attendance', href: '/employee/attendance', icon: Clock, module: 'attendance' },
+  { title: 'Tasks', href: '/employee/tasks', icon: ClipboardList, module: 'tasks' },
+  { title: 'Expenses', href: '/employee/expenses', icon: Receipt, module: 'expenses' },
+  { title: 'Chat', href: '/employee/chat', icon: MessageSquare, module: 'chat' },
+  { title: 'Announcements', href: '/employee/announcements', icon: Megaphone, module: 'announcements' },
+  { title: 'Company Policies', href: '/employee/policies', icon: FileText, module: 'policies' },
+  { title: 'Payroll', href: '/employee/payroll', icon: Wallet, module: 'payroll', children: [
+    { title: 'Pre Payments', href: '/employee/pre-payments', icon: Banknote, module: 'payroll' },
+    { title: 'Increment/Promotion', href: '/employee/increments', icon: TrendingUp, module: 'payroll' },
+    { title: 'Payroll', href: '/employee/payroll', icon: IndianRupee, module: 'payroll' },
+    { title: 'My Salary', href: '/employee/salaries', icon: Wallet, module: 'payroll' },
   ]},
+  { title: 'Settings', href: '/employee/settings', icon: Settings },
 ];
 
 const clientNavItems: NavItem[] = [
@@ -138,6 +145,32 @@ const getNavItems = (role: UserRole): NavItem[] => {
     default:
       return [];
   }
+};
+
+/** Filter nav items based on DB permissions — items without a `module` tag are always shown */
+const filterNavByPermissions = (items: NavItem[], canView: (mod: string) => boolean): NavItem[] => {
+  return items.reduce<NavItem[]>((acc, item) => {
+    // If no module tag, always show (e.g. My Profile, Holidays)
+    if (!item.module) {
+      acc.push(item);
+      return acc;
+    }
+    // Check if user has view permission for this module
+    if (!canView(item.module)) return acc;
+
+    // If item has children, filter them too
+    if (item.children && item.children.length > 0) {
+      const filteredChildren = item.children.filter(
+        child => !child.module || canView(child.module)
+      );
+      if (filteredChildren.length > 0) {
+        acc.push({ ...item, children: filteredChildren });
+      }
+    } else {
+      acc.push(item);
+    }
+    return acc;
+  }, []);
 };
 
 const getRoleLabel = (role: UserRole): string => {
@@ -163,6 +196,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { userRole, userName, logout } = useAuth();
+  const { canView } = usePermissions();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
@@ -177,7 +211,13 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     navigate('/login');
   };
 
-  const navItems = getNavItems(userRole);
+  // Get base nav items for the role, then filter by DB permissions
+  const baseNavItems = getNavItems(userRole);
+  const navItems = useMemo(() => {
+    // Admin & client nav items are never filtered
+    if (userRole === 'admin' || userRole === 'client') return baseNavItems;
+    return filterNavByPermissions(baseNavItems, canView);
+  }, [userRole, baseNavItems, canView]);
 
   const getNotifIcon = (type: string) => {
     if (type.includes('approved')) return <CheckCircle className="h-4 w-4 text-success" />;

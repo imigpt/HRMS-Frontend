@@ -13,8 +13,19 @@ export const authAPI = {
   forgotPassword: (email: string) =>
     api.post('/auth/forgot-password', { email }),
   
-  resetPassword: (token: string, newPassword: string) =>
-    api.post('/auth/reset-password', { token, newPassword }),
+  resetPassword: (email: string, resetToken: string, newPassword: string) =>
+    api.post('/auth/reset-password', { email, resetToken, newPassword }),
+
+  changePassword: (currentPassword: string, newPassword: string) =>
+    api.put('/auth/change-password', { currentPassword, newPassword }),
+
+  adminResetPassword: (userId: string, newPassword?: string) =>
+    api.put(`/auth/admin-reset-password/${userId}`, { newPassword }),
+
+  generatePassword: () => api.get('/auth/generate-password'),
+
+  getUserCredentials: (params?: any) =>
+    api.get('/auth/user-credentials', { params }),
 };
 
 // Admin APIs
@@ -103,9 +114,7 @@ export const attendanceAPI = {
       if (location) {
         formData.append('location', JSON.stringify(location));
       }
-      return api.post('/attendance/check-in', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      return api.post('/attendance/check-in', formData);
     }
     // Otherwise, just send location as JSON
     return api.post('/attendance/check-in', { location });
@@ -150,9 +159,7 @@ export const taskAPI = {
     const formData = new FormData();
     formData.append('attachment', file);
     formData.append('fileType', fileType);
-    return api.post(`/tasks/${id}/attachments`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    return api.post(`/tasks/${id}/attachments`, formData);
   },
   deleteAttachment: (taskId: string, attachmentId: string) =>
     api.delete(`/tasks/${taskId}/attachments/${attachmentId}`),
@@ -191,9 +198,7 @@ export const chatAPI = {
     const formData = new FormData();
     formData.append('file', file);
     if (caption) formData.append('caption', caption);
-    return api.post(`/chat/rooms/${roomId}/upload`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    return api.post(`/chat/rooms/${roomId}/upload`, formData);
   },
   
   // Groups
@@ -245,9 +250,7 @@ export const clientAPI = {
           formData.append(key, value as any);
         }
       });
-      return api.post('/clients', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      return api.post('/clients', formData);
     }
     return api.post('/clients', data);
   },
@@ -285,7 +288,7 @@ export const policyAPI = {
   getPolicies: (params?: any) => api.get('/policies', { params }),
   getPolicyById: (id: string) => api.get(`/policies/${id}`),
   createPolicy: (data: FormData) =>
-    api.post('/policies', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+    api.post('/policies', data),
   deletePolicy: (id: string) => api.delete(`/policies/${id}`),
   // Fetches file as blob so JWT auth header is included automatically
   downloadFile: (id: string) =>
@@ -333,6 +336,84 @@ export const userAPI = {
   deleteUser: (id: string) => api.delete(`/user/${id}`),
 };
 
+// Settings APIs (Admin only)
+export const settingsAPI = {
+  // System settings
+  getAll: (params?: any) => api.get('/settings', { params }),
+  updateSetting: (data: { key: string; value: any; category: string; description?: string }) =>
+    api.put('/settings/update', data),
+  updateCategory: (category: string, settings: Record<string, any>) =>
+    api.put(`/settings/category/${category}`, { settings }),
+
+  // HRM Settings
+  getHRM: () => api.get('/settings/hrm'),
+  updateHRM: (data: any) => api.put('/settings/hrm', data),
+
+  // Company Settings
+  getCompany: () => api.get('/settings/company'),
+  updateCompany: (data: any) => api.put('/settings/company', data),
+
+  // Employee ID Config
+  getEmployeeIDConfig: () => api.get('/settings/employee-id'),
+  updateEmployeeIDConfig: (data: any) => api.put('/settings/employee-id', data),
+  assignEmployeeID: (data: { userId: string; customId?: string }) =>
+    api.post('/settings/employee-id/assign', data),
+  getEmployeeID: (userId: string) => api.get(`/settings/employee-id/${userId}`),
+
+  // Permission Modules
+  getPermissionModules: () => api.get('/settings/modules'),
+  createPermissionModule: (data: { name: string; label: string; description?: string }) =>
+    api.post('/settings/modules', data),
+  seedPermissionModules: () => api.post('/settings/modules/seed'),
+  updatePermissionModule: (id: string, data: any) => api.put(`/settings/modules/${id}`, data),
+  deletePermissionModule: (id: string) => api.delete(`/settings/modules/${id}`),
+
+  // Roles & Permissions
+  getMyPermissions: () => api.get('/settings/roles/my-permissions'),
+  getRoles: () => api.get('/settings/roles'),
+  createRole: (data: any) => api.post('/settings/roles', data),
+  seedRoles: () => api.post('/settings/roles/seed'),
+  updateRole: (id: string, data: any) => api.put(`/settings/roles/${id}`, data),
+  deleteRole: (id: string) => api.delete(`/settings/roles/${id}`),
+  getRolePermissions: (id: string) => api.get(`/settings/roles/${id}/permissions`),
+  assignPermissions: (id: string, permissions: any[]) =>
+    api.put(`/settings/roles/${id}/permissions`, { permissions }),
+
+  // Email Settings
+  getEmail: () => api.get('/settings/email'),
+  updateEmail: (data: any) => api.put('/settings/email', data),
+  sendTestEmail: (to: string) => api.post('/settings/email/test', { to }),
+  sendBulkEmail: (data: { recipients?: string[]; subject: string; body: string; targetRole?: string }) =>
+    api.post('/settings/email/send', data),
+  getEmailLogs: (params?: any) => api.get('/settings/email/logs', { params }),
+
+  // Email Templates
+  getEmailTemplates: (params?: any) => api.get('/settings/email/templates', { params }),
+  getEmailTemplate: (id: string) => api.get(`/settings/email/templates/${id}`),
+  createEmailTemplate: (data: any) => api.post('/settings/email/templates', data),
+  updateEmailTemplate: (id: string, data: any) => api.put(`/settings/email/templates/${id}`, data),
+  deleteEmailTemplate: (id: string) => api.delete(`/settings/email/templates/${id}`),
+  seedEmailTemplates: () => api.post('/settings/email/templates/seed'),
+  sendFromTemplate: (id: string, data: { recipients: string[]; customVariables?: Record<string, string> }) =>
+    api.post(`/settings/email/templates/${id}/send`, data),
+
+  // Storage Settings
+  getStorage: () => api.get('/settings/storage'),
+  updateStorage: (data: any) => api.put('/settings/storage', data),
+
+  // Localization
+  getLocalization: () => api.get('/settings/localization'),
+  updateLocalization: (data: any) => api.put('/settings/localization', data),
+
+  // Payroll Settings
+  getPayroll: () => api.get('/settings/payroll'),
+  updatePayroll: (data: any) => api.put('/settings/payroll', data),
+
+  // Work Status
+  getWorkStatus: () => api.get('/settings/work-status'),
+  updateWorkStatus: (statuses: string[]) => api.put('/settings/work-status', { statuses }),
+};
+
 // Export all APIs
 export default {
   auth: authAPI,
@@ -349,4 +430,5 @@ export default {
   user: userAPI,
   policy: policyAPI,
   payroll: payrollAPI,
+  settings: settingsAPI,
 };

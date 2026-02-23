@@ -32,6 +32,7 @@ import {
 import { taskAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import DocumentViewer from '@/components/ui/DocumentViewer';
 
 interface TaskAttachment {
   _id?: string;
@@ -256,6 +257,9 @@ const EmployeeTasks = () => {
       toast({ title: 'Error', description: error.response?.data?.message || 'Failed to delete attachment', variant: 'destructive' });
     }
   };
+
+  // Document viewer
+  const [viewerDoc, setViewerDoc] = useState<{ url: string; name: string } | null>(null);
 
   const handleDownload = (url: string, name: string) => {
     const link = document.createElement('a');
@@ -646,8 +650,8 @@ const EmployeeTasks = () => {
                               <div className="flex gap-1">
                                 {attachment.url && attachment.url !== '#' && (
                                   <>
-                                    <Button variant="ghost" size="sm" onClick={() => window.open(attachment.url, '_blank')}><Eye className="h-4 w-4" /></Button>
-                                    <Button variant="ghost" size="sm" onClick={() => handleDownload(attachment.url, attachment.name)}><Download className="h-4 w-4" /></Button>
+                                    <Button variant="ghost" size="sm" title="View" onClick={() => setViewerDoc({ url: attachment.url, name: attachment.name })}><Eye className="h-4 w-4" /></Button>
+                                    <Button variant="ghost" size="sm" title="Download" onClick={() => handleDownload(attachment.url, attachment.name)}><Download className="h-4 w-4" /></Button>
                                   </>
                                 )}
                                 <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDeleteAttachment(attachment._id || attachment.id || '')}><Trash2 className="h-4 w-4" /></Button>
@@ -747,10 +751,10 @@ const EmployeeTasks = () => {
                               <div className="flex gap-1">
                                 {att.url && att.url !== '#' && (
                                   <>
-                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => window.open(att.url, '_blank')}>
+                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="View" onClick={() => setViewerDoc({ url: att.url, name: att.name })}>
                                       <Eye className="h-3 w-3" />
                                     </Button>
-                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDownload(att.url, att.name)}>
+                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Download" onClick={() => handleDownload(att.url, att.name)}>
                                       <Download className="h-3 w-3" />
                                     </Button>
                                   </>
@@ -776,6 +780,16 @@ const EmployeeTasks = () => {
           </DialogContent>
         </Dialog>
       </div>
+      )}
+
+      {/* ── Document Viewer ── */}
+      {viewerDoc && (
+        <DocumentViewer
+          open={!!viewerDoc}
+          onClose={() => setViewerDoc(null)}
+          url={viewerDoc.url}
+          fileName={viewerDoc.name}
+        />
       )}
     </DashboardLayout>
   );

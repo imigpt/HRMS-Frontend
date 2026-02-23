@@ -181,6 +181,89 @@ const AttendanceModule = ({ role }: AttendanceModuleProps) => {
     return matchesSearch && matchesStatus && matchesRole;
   });
 
+  const handleExport = () => {
+    if (filteredData.length === 0) {
+      toast({ title: 'No records', description: 'No attendance records to export' });
+      return;
+    }
+
+    try {
+      const rows: string[] = [];
+      const header = [
+        'Employee',
+        'Date',
+        'Punch In',
+        'Punch Out',
+        'Total Hours',
+        'Status',
+        'Check In Latitude',
+        'Check In Longitude',
+        'Check Out Latitude',
+        'Check Out Longitude',
+      ];
+      rows.push(header.join(','));
+
+      filteredData.forEach((record) => {
+        const employeeName = (record.user?.name || record.employeeName || '').replace(/\r?\n|,/g, ' ');
+        const date = record.date ? new Date(record.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+        const checkInTime = record.checkIn?.time || record.checkInTime || '';
+        const checkOutTime = record.checkOut?.time || record.checkOutTime || '';
+        const checkIn = checkInTime ? new Date(checkInTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+        const checkOut = checkOutTime ? new Date(checkOutTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+
+        let hours = '';
+        if (record.workHours) {
+          hours = `${Math.floor(record.workHours / 60)}h ${record.workHours % 60}m`;
+        } else if (checkInTime && checkOutTime) {
+          const diff = new Date(checkOutTime).getTime() - new Date(checkInTime).getTime();
+          const totalMinutes = Math.floor(diff / (1000 * 60));
+          hours = `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
+        }
+
+        const status = record.status || '';
+        const inLat = record.checkIn?.location?.latitude ?? '';
+        const inLng = record.checkIn?.location?.longitude ?? '';
+        const outLat = record.checkOut?.location?.latitude ?? '';
+        const outLng = record.checkOut?.location?.longitude ?? '';
+
+        const row = [
+          `"${employeeName}"`,
+          `"${date}"`,
+          `"${checkIn}"`,
+          `"${checkOut}"`,
+          `"${hours}"`,
+          `"${status}"`,
+          inLat,
+          inLng,
+          outLat,
+          outLng,
+        ];
+
+        rows.push(row.join(','));
+      });
+
+      const csvContent = rows.join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const dt = new Date();
+      const yyyy = dt.getFullYear();
+      const mm = String(dt.getMonth() + 1).padStart(2, '0');
+      const dd = String(dt.getDate()).padStart(2, '0');
+      a.download = `attendance-export-${yyyy}${mm}${dd}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({ title: 'Exported', description: 'Attendance CSV exported' });
+    } catch (err) {
+      console.error('Export error', err);
+      toast({ title: 'Export failed', description: 'Could not export attendance records', variant: 'destructive' });
+    }
+  };
+
   const stats = {
     present: attendanceData.filter(r => r.status === 'present').length,
     late: attendanceData.filter(r => r.status === 'late').length,
@@ -294,7 +377,7 @@ const AttendanceModule = ({ role }: AttendanceModuleProps) => {
                     </SelectContent>
                   </Select>
                 )}
-                <Button variant="secondary">
+                <Button variant="secondary" onClick={handleExport}>
                   <Download className="h-4 w-4 mr-2" />
                   Export
                 </Button>
@@ -305,7 +388,7 @@ const AttendanceModule = ({ role }: AttendanceModuleProps) => {
             <div className="rounded-lg border border-border overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-secondary/50">
+                    <TableRow className="bg-secondary/50">
                     <TableHead>Employee</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Punch In</TableHead>
@@ -313,19 +396,20 @@ const AttendanceModule = ({ role }: AttendanceModuleProps) => {
                     <TableHead>Total Hours</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Photo</TableHead>
-                    <TableHead>Location</TableHead>
+                    <TableHead>Check In Location</TableHead>
+                    <TableHead>Check Out Location</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading && attendanceData.length === 0 ? (
                     <TableRow key="loading">
-                      <TableCell colSpan={8} className="text-center py-8">
+                      <TableCell colSpan={9} className="text-center py-8">
                         <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
                       </TableCell>
                     </TableRow>
                   ) : filteredData.length === 0 ? (
                     <TableRow key="empty">
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                         No attendance records found
                       </TableCell>
                     </TableRow>
@@ -360,6 +444,7 @@ const AttendanceModule = ({ role }: AttendanceModuleProps) => {
                       }
                       
                       const checkInLocation = record.checkIn?.location;
+                      const checkOutLocation = record.checkOut?.location;
                       
                       return (
                         <TableRow key={record._id} className="hover:bg-secondary/30">
@@ -407,6 +492,26 @@ const AttendanceModule = ({ role }: AttendanceModuleProps) => {
                                 <MapPin className="h-3 w-3" />
                                 <span className="text-xs underline">
                                   {checkInLocation.latitude.toFixed(4)}, {checkInLocation.longitude.toFixed(4)}
+                                </span>
+                              </a>
+                            ) : (
+                              <div className="flex items-center gap-1 text-muted-foreground">
+                                <MapPin className="h-3 w-3" />
+                                <span className="text-xs">-</span>
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {checkOutLocation ? (
+                              <a
+                                href={`https://www.google.com/maps?q=${checkOutLocation.latitude},${checkOutLocation.longitude}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-primary hover:text-primary/80 transition-colors"
+                              >
+                                <MapPin className="h-3 w-3" />
+                                <span className="text-xs underline">
+                                  {checkOutLocation.latitude.toFixed(4)}, {checkOutLocation.longitude.toFixed(4)}
                                 </span>
                               </a>
                             ) : (

@@ -52,6 +52,7 @@ import {
 import { policyAPI } from '@/lib/apiClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import DocumentViewer from '@/components/ui/DocumentViewer';
 
 interface PolicyFile {
   url: string;
@@ -92,6 +93,8 @@ const CompanyPolicies = () => {
 
   // View dialog
   const [viewPolicy, setViewPolicy] = useState<Policy | null>(null);
+  // Document viewer
+  const [viewerDoc, setViewerDoc] = useState<{ url: string; name: string; mimeType?: string } | null>(null);
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
   const fetchPolicies = useCallback(async () => {
@@ -454,13 +457,27 @@ const CompanyPolicies = () => {
                   : ''}
               </p>
               {viewPolicy?.file?.url ? (
-                <Button
-                  className="w-full glow-button"
-                  onClick={() => viewPolicy && handleDownload(viewPolicy)}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download {viewPolicy.file.originalName || 'Document'}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1 glow-button"
+                    onClick={() => setViewerDoc({
+                      url: viewPolicy.file!.url,
+                      name: viewPolicy.file!.originalName || viewPolicy.title,
+                      mimeType: viewPolicy.file!.mimeType,
+                    })}
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    Read Document
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => viewPolicy && handleDownload(viewPolicy)}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download
+                  </Button>
+                </div>
               ) : (
                 <p className="text-sm text-muted-foreground italic text-center py-2">
                   No document attached to this policy
@@ -497,8 +514,19 @@ const CompanyPolicies = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
-    </DashboardLayout>
+
+      {/* ── Document Viewer ── */}
+      {viewerDoc && (
+        <DocumentViewer
+          open={!!viewerDoc}
+          onClose={() => setViewerDoc(null)}
+          url={viewerDoc.url}
+          fileName={viewerDoc.name}
+          mimeType={viewerDoc.mimeType}
+        />
+      )}
+    </div>
+  </DashboardLayout>
   );
 };
 

@@ -852,21 +852,22 @@ const HRAttendance = () => {
                       <th className="text-left p-4 text-sm font-semibold text-foreground">Check Out</th>
                       <th className="text-left p-4 text-sm font-semibold text-foreground">Duration</th>
                       <th className="text-left p-4 text-sm font-semibold text-foreground">Photo</th>
-                      <th className="text-left p-4 text-sm font-semibold text-foreground">Location</th>
+                      <th className="text-left p-4 text-sm font-semibold text-foreground">Check In Location</th>
+                      <th className="text-left p-4 text-sm font-semibold text-foreground">Check Out Location</th>
                       <th className="text-left p-4 text-sm font-semibold text-foreground">Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {loading ? (
                       <tr>
-                        <td colSpan={8} className="p-8 text-center">
+                        <td colSpan={9} className="p-8 text-center">
                           <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
                           <p className="text-muted-foreground">Loading attendance records...</p>
                         </td>
                       </tr>
                     ) : monthAttendance.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                        <td colSpan={9} className="p-8 text-center text-muted-foreground">
                           No attendance records found for this month
                         </td>
                       </tr>
@@ -919,6 +920,22 @@ const HRAttendance = () => {
                                 rel="noopener noreferrer"
                                 className="flex items-center gap-1 text-primary hover:text-primary/80 transition-colors"
                                 title="View check-in location on Google Maps"
+                              >
+                                <MapPin className="h-4 w-4" />
+                                <span className="underline">View</span>
+                              </a>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </td>
+                          <td className="p-4 text-sm">
+                            {record.checkOut?.location ? (
+                              <a
+                                href={`https://www.google.com/maps?q=${record.checkOut.location.latitude},${record.checkOut.location.longitude}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-primary hover:text-primary/80 transition-colors"
+                                title="View check-out location on Google Maps"
                               >
                                 <MapPin className="h-4 w-4" />
                                 <span className="underline">View</span>

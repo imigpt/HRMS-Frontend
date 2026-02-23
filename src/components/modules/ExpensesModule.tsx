@@ -25,6 +25,7 @@ import {
 import { useApi } from '@/hooks/useApi';
 import { expenseAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
+import DocumentViewer from '@/components/ui/DocumentViewer';
 
 interface Expense {
   _id: string;
@@ -529,48 +530,13 @@ const ExpensesModule = ({ role }: ExpensesModuleProps) => {
         </Card>
       </div>
 
-      {/* Receipt/Bill Photo Viewing Dialog */}
-      <Dialog open={receiptDialogOpen} onOpenChange={setReceiptDialogOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Bill Photo / Receipt</DialogTitle>
-            <DialogDescription>
-              Uploaded receipt for expense claim
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {selectedReceipt && (
-              <div className="relative w-full">
-                <img
-                  src={selectedReceipt}
-                  alt="Receipt"
-                  className="w-full h-auto max-h-[70vh] object-contain rounded-lg border border-border"
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="absolute top-2 right-2"
-                  onClick={() => window.open(selectedReceipt, '_blank')}
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Open in New Tab
-                </Button>
-              </div>
-            )}
-          </div>
-          <div className="flex justify-end">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setReceiptDialogOpen(false);
-                setSelectedReceipt(null);
-              }}
-            >
-              Close
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Receipt/Bill — unified Document Viewer */}
+      <DocumentViewer
+        open={receiptDialogOpen}
+        onClose={() => { setReceiptDialogOpen(false); setSelectedReceipt(null); }}
+        url={selectedReceipt || ''}
+        fileName="Receipt"
+      />
 
       {/* Edit Expense Dialog (HR) */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>

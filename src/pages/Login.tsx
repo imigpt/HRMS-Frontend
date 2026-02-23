@@ -158,10 +158,7 @@ const Login = () => {
             <button
               type="button"
               className="text-sm text-primary hover:underline"
-              onClick={() => {
-                // TODO: Implement forgot password flow
-                alert('Forgot password feature coming soon!');
-              }}
+              onClick={() => navigate('/forgot-password')}
             >
               Forgot password?
             </button>

@@ -48,8 +48,10 @@ import {
   Play,
   Pause,
   MessageSquarePlus,
+  Eye,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import DocumentViewer from '@/components/ui/DocumentViewer';
 import { chatAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -77,6 +79,8 @@ const ChatModule = ({ role }: ChatModuleProps) => {
   // Media states
   const [showMediaMenu, setShowMediaMenu] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
+  // Document viewer
+  const [viewerDoc, setViewerDoc] = useState<{ url: string; name: string; mimeType?: string } | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   
@@ -735,13 +739,26 @@ const ChatModule = ({ role }: ChatModuleProps) => {
                 {msg.attachment?.size ? `${(msg.attachment.size / 1024).toFixed(1)} KB` : ''}
               </p>
             </div>
-            <Button 
-              size="icon" 
-              variant="ghost"
-              onClick={() => window.open(msg.attachment?.url, '_blank')}
-            >
-              <Download className="h-4 w-4" />
-            </Button>
+            <div className="flex gap-1">
+              {msg.attachment?.url && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  title="View document"
+                  onClick={() => setViewerDoc({ url: msg.attachment!.url, name: msg.attachment!.name || 'Document', mimeType: msg.attachment!.mimeType })}
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
+              )}
+              <Button
+                size="icon"
+                variant="ghost"
+                title="Download"
+                onClick={() => window.open(msg.attachment?.url, '_blank')}
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         );
       case 'voice':
@@ -1342,6 +1359,17 @@ const ChatModule = ({ role }: ChatModuleProps) => {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* ── Document Viewer ── */}
+      {viewerDoc && (
+        <DocumentViewer
+          open={!!viewerDoc}
+          onClose={() => setViewerDoc(null)}
+          url={viewerDoc.url}
+          fileName={viewerDoc.name}
+          mimeType={viewerDoc.mimeType}
+        />
+      )}
     </DashboardLayout>
   );
 };
