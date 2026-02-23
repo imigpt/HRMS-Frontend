@@ -7,6 +7,7 @@ import {
   attendanceAPI,
   chatAPI,
   hrAPI,
+  taskAPI,
 } from '@/lib/apiClient';
 
 // ─── safe array extractor ─────────────────────────────────────────────────────
@@ -31,7 +32,10 @@ export type NotificationType =
   | 'attendance_edit_approved'
   | 'attendance_edit_rejected'
   | 'attendance_edit_pending'
-  | 'chat';
+  | 'chat'
+  | 'task_assigned'
+  | 'task_progress'
+  | 'task_reviewed';
 
 export interface AppNotification {
   id: string;
@@ -272,6 +276,59 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
         });
       } catch { /* silent */ }
     }
+
+    // ── 7. Task notifications ─────────────────────────────────────────────
+    const taskLink = userRole === 'admin' ? '/admin/tasks' : userRole === 'hr' ? '/hr/tasks' : '/employee/tasks';
+    try {
+      const res = await taskAPI.getTasks();
+      const tasks: any[] = safeArray(res, 'data', 'tasks');
+
+      if (userRole === 'employee') {
+        // Employee: notify about tasks assigned (recently created)
+        tasks.slice(0, 5).forEach((t: any) => {
+          const id = `task_assigned_${t._id}`;
+          result.push({
+            id,
+            type: 'task_assigned',
+            title: '📋 New Task Assigned',
+            message: `"${t.title}" — Priority: ${t.priority}, Due: ${t.dueDate ? new Date(t.dueDate).toLocaleDateString() : 'N/A'}`,
+            time: t.createdAt || t.createdDate || new Date().toISOString(),
+            read: isRead(id),
+            link: taskLink,
+          });
+        });
+
+        // Employee: notify about reviews on their tasks
+        tasks.filter((t: any) => t.review?.comment).slice(0, 5).forEach((t: any) => {
+          const id = `task_reviewed_${t._id}`;
+          result.push({
+            id,
+            type: 'task_reviewed',
+            title: '⭐ Task Reviewed',
+            message: `Your task "${t.title}" received a review${t.review.rating ? ` (${t.review.rating}/5)` : ''}`,
+            time: t.review.reviewedAt || t.updatedAt || new Date().toISOString(),
+            read: isRead(id),
+            link: taskLink,
+          });
+        });
+      }
+
+      if (userRole === 'hr' || userRole === 'admin') {
+        // HR/Admin: notify about tasks with progress updates
+        tasks.filter((t: any) => t.progress > 0 && t.status !== 'completed').slice(0, 5).forEach((t: any) => {
+          const id = `task_progress_${t._id}_${t.progress}`;
+          result.push({
+            id,
+            type: 'task_progress',
+            title: '📊 Task Progress Updated',
+            message: `"${t.title}" — ${t.assignedTo?.name || 'Employee'} updated progress to ${t.progress}%`,
+            time: t.updatedAt || new Date().toISOString(),
+            read: isRead(id),
+            link: taskLink,
+          });
+        });
+      }
+    } catch { /* silent */ }
 
     // Sort newest first
     result.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());

@@ -35,7 +35,7 @@ interface Task {
   dueDate: string;
   deadline?: string;
   progress: number;
-  status: 'pending' | 'in-progress' | 'completed';
+  status: 'todo' | 'in-progress' | 'completed' | 'cancelled';
   priority: 'low' | 'medium' | 'high';
   attachments?: number;
 }
@@ -165,12 +165,12 @@ const TasksModule = ({ role }: TasksModuleProps) => {
   });
 
   const stats = {
-    pending: tasks.filter(t => t.status === 'pending').length,
+    todo: tasks.filter(t => t.status === 'todo').length,
     inProgress: tasks.filter(t => t.status === 'in-progress').length,
     completed: tasks.filter(t => t.status === 'completed').length,
   };
 
-  const canCreate = role === 'hr';
+  const canCreate = role === 'hr' || role === 'admin';
 
   return (
     <DashboardLayout>
@@ -184,8 +184,8 @@ const TasksModule = ({ role }: TasksModuleProps) => {
                   <Circle className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-foreground">{stats.pending}</p>
-                  <p className="text-xs text-muted-foreground">Pending</p>
+                  <p className="text-2xl font-bold text-foreground">{stats.todo}</p>
+                  <p className="text-xs text-muted-foreground">To Do</p>
                 </div>
               </div>
             </CardContent>
@@ -236,7 +236,7 @@ const TasksModule = ({ role }: TasksModuleProps) => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Tasks</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="todo">To Do</SelectItem>
                     <SelectItem value="in-progress">In Progress</SelectItem>
                     <SelectItem value="completed">Completed</SelectItem>
                   </SelectContent>
@@ -288,43 +288,6 @@ const TasksModule = ({ role }: TasksModuleProps) => {
                             <Select value={formData.priority} onValueChange={(value) => setFormData({ ...formData, priority: value as 'low' | 'medium' | 'high' })}>
                               <SelectTrigger className="bg-secondary border-border">
                                 <SelectValue placeholder="Priority" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="low">Low</SelectItem>
-                                <SelectItem value="medium">Medium</SelectItem>
-                                <SelectItem value="high">High</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Due Date</Label>
-                          <Input 
-                            type="date" 
-                            className="bg-secondary border-border"
-                            value={formData.dueDate}
-                            onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                          />
-                        </div>
-                        <Button className="w-full glow-button" onClick={handleCreateTask} disabled={loading}>
-                          {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Creating...</> : 'Create Task'}
-                        </Button>
-                      </div>
-                              <SelectTrigger className="bg-secondary border-border">
-                                <SelectValue placeholder="Select employee" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="john">John Doe</SelectItem>
-                                <SelectItem value="jane">Jane Smith</SelectItem>
-                                <SelectItem value="mike">Mike Johnson</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Priority</Label>
-                            <Select value={formData.priority} onValueChange={(value) => setFormData({ ...formData, priority: value as 'low' | 'medium' | 'high' })}>
-                              <SelectTrigger className="bg-secondary border-border">
-                                <SelectValue placeholder="Select priority" />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="low">Low</SelectItem>
@@ -421,8 +384,10 @@ const TasksModule = ({ role }: TasksModuleProps) => {
                     </div>
                   )}
                 </div>
-              ))}
+              );
+            })}
             </div>
+            )}
           </CardContent>
         </Card>
       </div>

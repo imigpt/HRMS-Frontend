@@ -146,13 +146,18 @@ export const taskAPI = {
   updateProgress: (id: string, progress: number) =>
     api.put(`/tasks/${id}/progress`, { progress }),
   getStatistics: (params?: any) => api.get('/tasks/statistics', { params }),
-  addAttachment: (id: string, file: File) => {
+  addAttachment: (id: string, file: File, fileType: string) => {
     const formData = new FormData();
     formData.append('attachment', file);
+    formData.append('fileType', fileType);
     return api.post(`/tasks/${id}/attachments`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+  deleteAttachment: (taskId: string, attachmentId: string) =>
+    api.delete(`/tasks/${taskId}/attachments/${attachmentId}`),
+  addReview: (id: string, data: { comment: string; rating?: number }) =>
+    api.put(`/tasks/${id}/review`, data),
 };
 
 // Expense APIs
@@ -163,8 +168,8 @@ export const expenseAPI = {
   updateExpense: (id: string, data: any) => api.put(`/expenses/${id}`, data),
   deleteExpense: (id: string) => api.delete(`/expenses/${id}`),
   approveExpense: (id: string) => api.put(`/expenses/${id}/approve`),
-  rejectExpense: (id: string, reason?: string) =>
-    api.put(`/expenses/${id}/reject`, { reason }),
+  rejectExpense: (id: string, reviewNote?: string) =>
+    api.put(`/expenses/${id}/reject`, { reviewNote }),
   getStatistics: (params?: any) => api.get('/expenses/statistics', { params }),
 };
 

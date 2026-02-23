@@ -20,6 +20,7 @@ import {
   FileText,
   Loader2,
   ExternalLink,
+  Pencil,
 } from 'lucide-react';
 import { useApi } from '@/hooks/useApi';
 import { expenseAPI } from '@/lib/apiClient';
@@ -77,6 +78,10 @@ const ExpensesModule = ({ role }: ExpensesModuleProps) => {
   const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  // Edit expense state (HR)
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [editFormData, setEditFormData] = useState({ category: '', amount: '', description: '', date: '' });
   const { loading, execute } = useApi();
   const { toast } = useToast();
 
@@ -153,6 +158,38 @@ const ExpensesModule = ({ role }: ExpensesModuleProps) => {
         description: error.response?.data?.message || 'Failed to approve expense',
         variant: 'destructive',
       });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const openEditExpense = (expense: Expense) => {
+    setEditingExpense(expense);
+    setEditFormData({
+      category: expense.category,
+      amount: String(expense.amount),
+      description: expense.description,
+      date: expense.date ? new Date(expense.date).toISOString().split('T')[0] : '',
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleEditExpense = async () => {
+    if (!editingExpense) return;
+    try {
+      setActionLoading(true);
+      await expenseAPI.updateExpense(editingExpense._id || editingExpense.id || '', {
+        category: editFormData.category,
+        amount: Number(editFormData.amount),
+        description: editFormData.description,
+        date: editFormData.date,
+      });
+      toast({ title: 'Success', description: 'Expense updated successfully' });
+      setEditDialogOpen(false);
+      setEditingExpense(null);
+      fetchExpenses();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.response?.data?.message || 'Failed to update expense', variant: 'destructive' });
     } finally {
       setActionLoading(false);
     }
@@ -441,28 +478,44 @@ const ExpensesModule = ({ role }: ExpensesModuleProps) => {
                     </div>
                     <div className="flex items-center gap-3">
                       {getStatusBadge(expense.status)}
-                      {canApprove && expense.status === 'pending' && (
+                      {canApprove && (
                         <div className="flex gap-2">
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="text-success hover:text-success hover:bg-success/10"
-                            onClick={() => handleApprove(expense._id || expense.id || '')}
+                          {expense.status === 'pending' && (
+                            <>
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                className="text-success hover:text-success hover:bg-success/10"
+                                onClick={() => handleApprove(expense._id || expense.id || '')}
+                                disabled={actionLoading}
+                                title="Approve"
+                              >
+                                <CheckCircle className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => {
+                                  setSelectedExpenseId(expense._id || expense.id || null);
+                                  setRejectDialogOpen(true);
+                                }}
+                                disabled={actionLoading}
+                                title="Reject"
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-primary hover:text-primary/80 hover:bg-primary/10"
+                            onClick={() => openEditExpense(expense)}
                             disabled={actionLoading}
+                            title="Edit"
                           >
-                            <CheckCircle className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => {
-                              setSelectedExpenseId(expense._id || expense.id || null);
-                              setRejectDialogOpen(true);
-                            }}
-                            disabled={actionLoading}
-                          >
-                            <XCircle className="h-4 w-4" />
+                            <Pencil className="h-4 w-4" />
                           </Button>
                         </div>
                       )}
@@ -515,6 +568,69 @@ const ExpensesModule = ({ role }: ExpensesModuleProps) => {
             >
               Close
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Expense Dialog (HR) */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="glass-card">
+          <DialogHeader>
+            <DialogTitle>Edit Expense</DialogTitle>
+            <DialogDescription>Update the expense details</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select value={editFormData.category} onValueChange={(v) => setEditFormData({ ...editFormData, category: v })}>
+                <SelectTrigger className="bg-secondary border-border">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="travel">Travel</SelectItem>
+                  <SelectItem value="food">Food/Meals</SelectItem>
+                  <SelectItem value="office-supplies">Office Supplies</SelectItem>
+                  <SelectItem value="software">Software</SelectItem>
+                  <SelectItem value="training">Training</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Amount (₹)</Label>
+                <Input
+                  type="number"
+                  className="bg-secondary border-border"
+                  value={editFormData.amount}
+                  onChange={(e) => setEditFormData({ ...editFormData, amount: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Date</Label>
+                <Input
+                  type="date"
+                  className="bg-secondary border-border"
+                  value={editFormData.date}
+                  onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                placeholder="Describe the expense"
+                className="bg-secondary border-border"
+                value={editFormData.description}
+                onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+              />
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setEditDialogOpen(false)} disabled={actionLoading}>Cancel</Button>
+              <Button className="glow-button" onClick={handleEditExpense} disabled={actionLoading}>
+                {actionLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</> : 'Save Changes'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

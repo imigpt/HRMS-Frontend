@@ -296,7 +296,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
             <UserCircle className="w-6 h-6 text-primary" />
           </div>
           {sidebarOpen && (
-            <div className="slide-in-left overflow-hidden">
+            <div className="overflow-hidden">
               <p className="text-sm font-medium text-foreground truncate">{userName}</p>
               <p className="text-xs text-muted-foreground">{getRoleLabel(userRole)}</p>
             </div>

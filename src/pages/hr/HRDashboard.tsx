@@ -36,7 +36,7 @@ import {
   AlertTriangle,
   TrendingUp,
 } from 'lucide-react';
-import { hrAPI, leaveAPI, expenseAPI, attendanceAPI, employeeAPI } from '@/lib/apiClient';
+import { hrAPI, leaveAPI, expenseAPI, attendanceAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
 
 const HRDashboard = () => {
@@ -77,15 +77,13 @@ const HRDashboard = () => {
         setHrProfileData(dashboardRes.data.data?.user || null);
       }
 
-      // Load only HR user's own leaves for this section
-      let myLeaves: any[] = [];
-      try {
-        const myRes = await employeeAPI.getMyLeaves();
-        myLeaves = Array.isArray(myRes.data?.data) ? myRes.data.data : [];
-      } catch (e) {
-        myLeaves = [];
-      }
-      setPendingLeaves(myLeaves);
+      // Load pending employee leave requests for the company
+      const pendingLeavesData = Array.isArray(leavesRes.data?.data)
+        ? leavesRes.data.data
+        : Array.isArray(leavesRes.data)
+        ? leavesRes.data
+        : [];
+      setPendingLeaves(pendingLeavesData);
       setPendingExpenses(Array.isArray(expensesRes.data.data) ? expensesRes.data.data : []);
       // Handle nested attendance data structure
       const attendanceData = attendanceRes.data.data;
@@ -381,7 +379,7 @@ const HRDashboard = () => {
                     size="sm"
                     variant="ghost"
                     className="mt-2 w-full text-xs"
-                    onClick={() => navigate('/hr/leaves')}
+                    onClick={() => navigate('/hr/employee-leaves')}
                   >
                     View All
                   </Button>

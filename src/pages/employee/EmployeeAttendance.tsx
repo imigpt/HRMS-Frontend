@@ -83,10 +83,7 @@ const EmployeeAttendance = () => {
   });
   const [submittingEdit, setSubmittingEdit] = useState(false);
 
-  // Half-day request state
-  const [isHalfDayDialogOpen, setIsHalfDayDialogOpen] = useState(false);
-  const [halfDayFormData, setHalfDayFormData] = useState({ date: '', reason: '' });
-  const [submittingHalfDay, setSubmittingHalfDay] = useState(false);
+  // Half-day request state (moved to Leave page)
   
   // Camera state
   const [showCamera, setShowCamera] = useState(false);
@@ -538,51 +535,7 @@ const EmployeeAttendance = () => {
     }
   };
   
-  const handleSubmitHalfDayRequest = async () => {
-    if (!halfDayFormData.date || !halfDayFormData.reason) {
-      toast({
-        title: 'Error',
-        description: 'Please fill in both date and reason',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (halfDayFormData.reason.length < 10) {
-      toast({
-        title: 'Error',
-        description: 'Reason must be at least 10 characters',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      setSubmittingHalfDay(true);
-      await attendanceAPI.requestHalfDay({
-        date: halfDayFormData.date,
-        reason: halfDayFormData.reason,
-      });
-
-      toast({
-        title: 'Success',
-        description: 'Half day request submitted! HR will review your request.',
-      });
-
-      setIsHalfDayDialogOpen(false);
-      setHalfDayFormData({ date: '', reason: '' });
-      await fetchMonthAttendance();
-      await fetchTodayAttendance();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.message || 'Failed to submit half day request',
-        variant: 'destructive',
-      });
-    } finally {
-      setSubmittingHalfDay(false);
-    }
-  };
+  // Half-day request handling moved to LeaveModule
 
   // Helper variables for checked in/out status
   const hasCheckedIn = !!todayAttendance?.checkIn?.time;
@@ -786,10 +739,7 @@ const EmployeeAttendance = () => {
                   <FileText className="h-4 w-4 mr-2" />
                   Apply Leave
                 </Button>
-                <Button variant="outline" size="lg" className="glass-card border-orange-500/40 text-orange-400 hover:bg-orange-500/10" onClick={() => setIsHalfDayDialogOpen(true)}>
-                  <Clock className="h-4 w-4 mr-2" />
-                  Apply Half Day
-                </Button>
+                {/* Apply Half Day moved to the Leave page */}
               </div>
             </div>
           </CardContent>
@@ -1181,59 +1131,7 @@ const EmployeeAttendance = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Half Day Request Dialog */}
-        <Dialog open={isHalfDayDialogOpen} onOpenChange={setIsHalfDayDialogOpen}>
-          <DialogContent className="glass-card max-w-lg">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-orange-400" />
-                Apply Half Day
-              </DialogTitle>
-              <DialogDescription>
-                Submit a half day request. HR will review and approve your request.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="halfDayDate">Date <span className="text-destructive">*</span></Label>
-                <Input
-                  id="halfDayDate"
-                  type="date"
-                  className="bg-secondary border-border"
-                  value={halfDayFormData.date}
-                  onChange={(e) => setHalfDayFormData({ ...halfDayFormData, date: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="halfDayReason">Reason <span className="text-destructive">*</span></Label>
-                <Textarea
-                  id="halfDayReason"
-                  placeholder="Explain why you need a half day (minimum 10 characters)"
-                  className="bg-secondary border-border min-h-[100px]"
-                  value={halfDayFormData.reason}
-                  onChange={(e) => setHalfDayFormData({ ...halfDayFormData, reason: e.target.value })}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {halfDayFormData.reason.length}/10 characters minimum
-                </p>
-              </div>
-            </div>
-            <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setIsHalfDayDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                className="bg-orange-500 hover:bg-orange-600 text-white"
-                onClick={handleSubmitHalfDayRequest}
-                disabled={submittingHalfDay || !halfDayFormData.date || !halfDayFormData.reason || halfDayFormData.reason.length < 10}
-              >
-                {submittingHalfDay && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                <Send className="h-4 w-4 mr-2" />
-                Submit Request
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        {/* Half Day Request moved to Leave page */}
       </div>
     </DashboardLayout>
   );

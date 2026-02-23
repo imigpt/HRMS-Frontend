@@ -17,10 +17,11 @@ import {
   Clock,
   Calendar,
   Loader2,
+  Send,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useApi } from '@/hooks/useApi';
-import { leaveAPI, leaveBalanceAPI, employeeAPI } from '@/lib/apiClient';
+import { leaveAPI, leaveBalanceAPI, employeeAPI, attendanceAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
 
 interface LeaveRequest {
@@ -80,6 +81,10 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
     endDate: '',
     reason: '',
   });
+  // Half-day request state
+  const [isHalfDayDialogOpen, setIsHalfDayDialogOpen] = useState(false);
+  const [halfDayFormData, setHalfDayFormData] = useState({ date: '', reason: '' });
+  const [submittingHalfDay, setSubmittingHalfDay] = useState(false);
   const { loading, execute } = useApi();
   const { toast } = useToast();
 
@@ -380,6 +385,82 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
                       </div>
                     </DialogContent>
                   </Dialog>
+                )}
+                {canApply && (
+                  <>
+                    <Dialog open={isHalfDayDialogOpen} onOpenChange={setIsHalfDayDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" className="glass-card border-orange-500/40 text-orange-400 hover:bg-orange-500/10">
+                          <Clock className="h-4 w-4 mr-2" />
+                          Apply Half Day
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="glass-card max-w-lg">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2">
+                            <Clock className="h-5 w-5 text-orange-400" />
+                            Apply Half Day
+                          </DialogTitle>
+                          <DialogDescription>
+                            Submit a half day request. HR will review and approve your request.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 mt-4">
+                          <div className="space-y-2">
+                            <Label> Date </Label>
+                            <Input
+                              type="date"
+                              className="bg-secondary border-border"
+                              value={halfDayFormData.date}
+                              onChange={(e) => setHalfDayFormData({ ...halfDayFormData, date: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Reason</Label>
+                            <Textarea
+                              placeholder="Explain why you need a half day (minimum 10 characters)"
+                              className="bg-secondary border-border min-h-[100px]"
+                              value={halfDayFormData.reason}
+                              onChange={(e) => setHalfDayFormData({ ...halfDayFormData, reason: e.target.value })}
+                            />
+                            <p className="text-xs text-muted-foreground">{halfDayFormData.reason.length}/10 characters minimum</p>
+                          </div>
+                          <div className="flex justify-end gap-3">
+                            <Button variant="outline" onClick={() => setIsHalfDayDialogOpen(false)}>Cancel</Button>
+                            <Button
+                              className="bg-orange-500 hover:bg-orange-600 text-white"
+                              onClick={async () => {
+                                if (!halfDayFormData.date || !halfDayFormData.reason) {
+                                  toast({ title: 'Error', description: 'Please fill in both date and reason', variant: 'destructive' });
+                                  return;
+                                }
+                                if (halfDayFormData.reason.length < 10) {
+                                  toast({ title: 'Error', description: 'Reason must be at least 10 characters', variant: 'destructive' });
+                                  return;
+                                }
+                                try {
+                                  setSubmittingHalfDay(true);
+                                  await execute(() => attendanceAPI.requestHalfDay({ date: halfDayFormData.date, reason: halfDayFormData.reason }));
+                                  toast({ title: 'Success', description: 'Half day request submitted! HR will review your request.' });
+                                  setIsHalfDayDialogOpen(false);
+                                  setHalfDayFormData({ date: '', reason: '' });
+                                  fetchLeaves();
+                                  if (role === 'employee' || role === 'hr') fetchLeaveBalance();
+                                } catch (error: any) {
+                                  toast({ title: 'Error', description: error.response?.data?.message || 'Failed to submit half day request', variant: 'destructive' });
+                                } finally {
+                                  setSubmittingHalfDay(false);
+                                }
+                              }}
+                              disabled={submittingHalfDay || !halfDayFormData.date || !halfDayFormData.reason || halfDayFormData.reason.length < 10}
+                            >
+                              {submittingHalfDay ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Submitting...</> : <><Send className="h-4 w-4 mr-2"/>Submit Request</>}
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </>
                 )}
               </div>
             </div>
