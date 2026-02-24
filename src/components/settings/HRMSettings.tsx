@@ -110,12 +110,12 @@ const HRMSettings = () => {
             {/* Clock In / Out Times */}
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label className="text-destructive font-medium">* Clock In Time</Label>
+                <Label className="text-destructive font-medium">* Check In Time</Label>
                 <Input type="time" className="bg-secondary border-border" value={settings.clockInTime}
                   onChange={e => setSettings(p => ({ ...p, clockInTime: e.target.value }))} />
               </div>
               <div className="space-y-2">
-                <Label className="text-destructive font-medium">* Clock Out Time</Label>
+                <Label className="text-destructive font-medium">* Check Out Time</Label>
                 <Input type="time" className="bg-secondary border-border" value={settings.clockOutTime}
                   onChange={e => setSettings(p => ({ ...p, clockOutTime: e.target.value }))} />
               </div>

@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Loader2, Save, ShieldCheck, Plus, Trash2, Edit, Wand2, Blocks, X } from 'lucide-react';
 import { settingsAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
@@ -36,6 +36,10 @@ const RolesPermissions = () => {
   const [permissions, setPermissions] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
   const [seeding, setSeeding] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [roleToDelete, setRoleToDelete] = useState<any | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => { fetchRoles(); fetchModules(); }, []);
@@ -130,6 +134,36 @@ const RolesPermissions = () => {
     } finally { setSeeding(false); }
   };
 
+  const openDeleteDialog = (role: any) => {
+    setRoleToDelete(role);
+    setDeleteConfirmText('');
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!roleToDelete) return;
+    // If system role, require exact name confirmation
+    if (roleToDelete.isSystem && deleteConfirmText !== roleToDelete.roleName) {
+      toast({ title: 'Confirmation required', description: 'Type the role name to confirm deletion', variant: 'destructive' });
+      return;
+    }
+    try {
+      setDeleting(true);
+      const body = roleToDelete.isSystem
+        ? { force: true, confirmRoleName: roleToDelete.roleName }
+        : undefined;
+      await settingsAPI.deleteRole(roleToDelete._id, body);
+      toast({ title: 'Deleted', description: `Role "${roleToDelete.roleName}" deleted` });
+      setDeleteDialogOpen(false);
+      setRoleToDelete(null);
+      fetchRoles();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.response?.data?.message || 'Failed to delete role', variant: 'destructive' });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   // Module management
   const handleAddModule = async () => {
     if (!moduleForm.name || !moduleForm.label) return;
@@ -216,6 +250,39 @@ const RolesPermissions = () => {
                   </div>
                 </DialogContent>
               </Dialog>
+
+                {/* Delete Role Confirmation Dialog */}
+                <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                  <DialogContent className="glass-card max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Delete Role</DialogTitle>
+                      <DialogDescription>
+                        {roleToDelete?.isSystem ? (
+                          <>
+                            This is a <strong>system</strong> role. Deleting it may affect permissions across the app.
+                            To confirm, type the role name <strong className="ml-1">{roleToDelete?.roleName}</strong> below.
+                          </>
+                        ) : (
+                          <>Are you sure you want to delete the role "{roleToDelete?.roleName}"? This action cannot be undone.</>
+                        )}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="mt-4">
+                      {roleToDelete?.isSystem && (
+                        <div className="space-y-2">
+                          <Label>Confirm Role Name</Label>
+                          <Input value={deleteConfirmText} onChange={(e) => setDeleteConfirmText(e.target.value)} className="bg-secondary border-border" />
+                        </div>
+                      )}
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => { setDeleteDialogOpen(false); setRoleToDelete(null); setDeleteConfirmText(''); }}>Cancel</Button>
+                      <Button className="glow-button" onClick={confirmDelete} disabled={deleting || (roleToDelete?.isSystem && deleteConfirmText !== roleToDelete?.roleName)}>
+                        {deleting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}Delete
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
             </div>
           </div>
         </CardHeader>
@@ -254,11 +321,9 @@ const RolesPermissions = () => {
                       <Button size="sm" variant="ghost" onClick={() => openPermissions(role)}>
                         <Edit className="h-4 w-4" />
                       </Button>
-                      {!role.isSystem && (
-                        <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDelete(role._id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
+                      <Button size="sm" variant="ghost" className={role.isSystem ? 'text-warning' : 'text-destructive'} onClick={() => { setRoleToDelete(role); setDeleteConfirmText(''); setDeleteDialogOpen(true); }}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>

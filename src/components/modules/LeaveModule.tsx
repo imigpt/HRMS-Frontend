@@ -35,6 +35,9 @@ interface LeaveRequest {
   employee?: { name: string };
   employeeName?: string;
   leaveType: string;
+  isHalfDay?: boolean;
+  session?: 'morning' | 'afternoon';
+  days?: number;
   startDate: string;
   endDate: string;
   reason: string;
@@ -83,7 +86,12 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
   });
   // Half-day request state
   const [isHalfDayDialogOpen, setIsHalfDayDialogOpen] = useState(false);
-  const [halfDayFormData, setHalfDayFormData] = useState({ date: '', reason: '' });
+  const [halfDayFormData, setHalfDayFormData] = useState({
+    leaveType: '',
+    date: new Date().toISOString().split('T')[0], // default to today (YYYY-MM-DD)
+    session: '',
+    reason: ''
+  });
   const [submittingHalfDay, setSubmittingHalfDay] = useState(false);
   const { loading, execute } = useApi();
   const { toast } = useToast();
@@ -98,13 +106,13 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
   const fetchLeaves = async () => {
     try {
       let result: any;
-      // For HR role, show only HR user's own leaves
-      if (role === 'hr') {
-        result = await execute(() => employeeAPI.getMyLeaves());
-        const data = result?.data?.data ?? result?.data ?? [];
+      // HR and Admin see all company leaves; Employee sees own leaves
+      if (role === 'employee') {
+        result = await execute(() => leaveAPI.getLeaves());
+        const data = result?.data ?? result;
         setLeaveRequests(Array.isArray(data) ? data : []);
       } else {
-        // Admin and employee see the standard leaves endpoint
+        // Admin and HR see the standard leaves endpoint (all company leaves)
         result = await execute(() => leaveAPI.getLeaves());
         const data = result?.data ?? result;
         setLeaveRequests(Array.isArray(data) ? data : []);
@@ -218,7 +226,7 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
     return request.status === filter;
   });
 
-  const canApprove = role === 'admin';
+  const canApprove = role === 'admin' || role === 'hr';
   const canApply = role === 'employee' || role === 'hr';
 
   return (
@@ -407,6 +415,31 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
                         </DialogHeader>
                         <div className="space-y-4 mt-4">
                           <div className="space-y-2">
+                            <Label>Leave Type</Label>
+                            <Select value={halfDayFormData.leaveType} onValueChange={(v) => setHalfDayFormData({ ...halfDayFormData, leaveType: v })}>
+                              <SelectTrigger className="bg-secondary border-border">
+                                <SelectValue placeholder="Select leave type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="paid">Paid Leave</SelectItem>
+                                <SelectItem value="sick">Sick Leave</SelectItem>
+                                <SelectItem value="unpaid">Unpaid Leave</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Session</Label>
+                            <Select value={halfDayFormData.session} onValueChange={(v) => setHalfDayFormData({ ...halfDayFormData, session: v })}>
+                              <SelectTrigger className="bg-secondary border-border">
+                                <SelectValue placeholder="Morning or Afternoon" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="morning">Morning</SelectItem>
+                                <SelectItem value="afternoon">Afternoon</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
                             <Label> Date </Label>
                             <Input
                               type="date"
@@ -430,8 +463,8 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
                             <Button
                               className="bg-orange-500 hover:bg-orange-600 text-white"
                               onClick={async () => {
-                                if (!halfDayFormData.date || !halfDayFormData.reason) {
-                                  toast({ title: 'Error', description: 'Please fill in both date and reason', variant: 'destructive' });
+                                if (!halfDayFormData.leaveType || !halfDayFormData.date || !halfDayFormData.session || !halfDayFormData.reason) {
+                                  toast({ title: 'Error', description: 'Please fill in all fields', variant: 'destructive' });
                                   return;
                                 }
                                 if (halfDayFormData.reason.length < 10) {
@@ -440,10 +473,15 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
                                 }
                                 try {
                                   setSubmittingHalfDay(true);
-                                  await execute(() => attendanceAPI.requestHalfDay({ date: halfDayFormData.date, reason: halfDayFormData.reason }));
+                                  await execute(() => leaveAPI.submitHalfDay({
+                                    leaveType: halfDayFormData.leaveType,
+                                    date: halfDayFormData.date,
+                                    session: halfDayFormData.session,
+                                    reason: halfDayFormData.reason,
+                                  }));
                                   toast({ title: 'Success', description: 'Half day request submitted! HR will review your request.' });
                                   setIsHalfDayDialogOpen(false);
-                                  setHalfDayFormData({ date: '', reason: '' });
+                                  setHalfDayFormData({ leaveType: '', date: new Date().toISOString().split('T')[0], session: '', reason: '' });
                                   fetchLeaves();
                                   if (role === 'employee' || role === 'hr') fetchLeaveBalance();
                                 } catch (error: any) {
@@ -452,7 +490,7 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
                                   setSubmittingHalfDay(false);
                                 }
                               }}
-                              disabled={submittingHalfDay || !halfDayFormData.date || !halfDayFormData.reason || halfDayFormData.reason.length < 10}
+                              disabled={submittingHalfDay || !halfDayFormData.leaveType || !halfDayFormData.date || !halfDayFormData.session || !halfDayFormData.reason || halfDayFormData.reason.length < 10}
                             >
                               {submittingHalfDay ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Submitting...</> : <><Send className="h-4 w-4 mr-2"/>Submit Request</>}
                             </Button>
@@ -483,8 +521,16 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
                       </Avatar>
                       <div>
                         <p className="font-medium text-foreground">{employeeName}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {request.leaveType} • {new Date(request.endDate).getDate() - new Date(request.startDate).getDate() + 1} day(s)
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          {request.isHalfDay ? (
+                            <Badge variant="outline" className="text-orange-400 border-orange-400/40 text-xs px-1.5 py-0">
+                              Half Day · {request.session === 'morning' ? 'Morning' : 'Afternoon'}
+                            </Badge>
+                          ) : (
+                            <span className="capitalize">{request.leaveType}</span>
+                          )}
+                          <span className="text-muted-foreground">·</span>
+                          <span>{request.days ?? 1} day(s)</span>
                         </p>
                       </div>
                     </div>
@@ -492,9 +538,9 @@ const LeaveModule = ({ role }: LeaveModuleProps) => {
                       <div className="text-right">
                         <p className="text-sm text-foreground flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {request.from} - {request.to}
+                          {new Date(request.startDate).toLocaleDateString()} {!request.isHalfDay && request.startDate !== request.endDate ? `- ${new Date(request.endDate).toLocaleDateString()}` : ''}
                         </p>
-                        <p className="text-xs text-muted-foreground">Applied: {request.appliedOn}</p>
+                        <p className="text-xs text-muted-foreground">Applied: {new Date(request.createdAt).toLocaleDateString()}</p>
                       </div>
                       {getStatusBadge(request.status)}
                       {canApprove && request.status === 'pending' && (

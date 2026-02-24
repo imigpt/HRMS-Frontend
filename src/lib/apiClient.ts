@@ -82,6 +82,8 @@ export const employeeAPI = {
 export const leaveAPI = {
   getLeaves: (params?: any) => api.get('/leaves', { params }),
   createLeave: (data: any) => api.post('/leaves', data),
+  submitHalfDay: (data: { leaveType: string; date: string; session: string; reason: string }) =>
+    api.post('/leaves/half-day', data),
   getLeaveById: (id: string) => api.get(`/leaves/${id}`),
   approveLeave: (id: string, reviewNote?: string) => 
     api.put(`/leaves/${id}/approve`, { reviewNote }),
@@ -374,7 +376,8 @@ export const settingsAPI = {
   createRole: (data: any) => api.post('/settings/roles', data),
   seedRoles: () => api.post('/settings/roles/seed'),
   updateRole: (id: string, data: any) => api.put(`/settings/roles/${id}`, data),
-  deleteRole: (id: string) => api.delete(`/settings/roles/${id}`),
+  deleteRole: (id: string, body?: { force?: boolean; confirmRoleName?: string; reassignUsersTo?: string }) =>
+    api.delete(`/settings/roles/${id}`, body ? { data: body } : undefined),
   getRolePermissions: (id: string) => api.get(`/settings/roles/${id}/permissions`),
   assignPermissions: (id: string, permissions: any[]) =>
     api.put(`/settings/roles/${id}/permissions`, { permissions }),
