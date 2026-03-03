@@ -30,11 +30,12 @@ import EmployeeAttendance from "./pages/employee/EmployeeAttendance";
 import EmployeeTasks from "./pages/employee/EmployeeTasks";
 import CompanyPolicies from './pages/CompanyPolicies';
 import ClientDashboard from './pages/client/ClientDashboard';
+import WorkflowRedirect from './pages/WorkflowRedirect';
+import { WorkflowDiagramPage } from './components/tasks/WorkflowDiagram';
 // Modules
 import ChatModule from "./components/modules/ChatModule";
 import AttendanceModule from "./components/modules/AttendanceModule";
 import LeaveModule from "./components/modules/LeaveModule";
-import TasksModule from "./components/modules/TasksModule";
 import ExpensesModule from "./components/modules/ExpensesModule";
 import AnnouncementsModule from "./components/modules/AnnouncementsModule";
 import CalendarModule from "./components/modules/CalendarModule";
@@ -64,6 +65,10 @@ const App = () => (
               <Route path="/" element={<Navigate to="/login" replace />} />
               <Route path="/login" element={<Login />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/workflow" element={<WorkflowRedirect />} />
+              <Route path="/admin/workflow" element={<ProtectedRoute allowedRole="admin"><WorkflowDiagramPage /></ProtectedRoute>} />
+              <Route path="/hr/workflow" element={<ProtectedRoute allowedRole="hr"><WorkflowDiagramPage /></ProtectedRoute>} />
+              <Route path="/employee/workflow" element={<ProtectedRoute allowedRole="employee"><WorkflowDiagramPage /></ProtectedRoute>} />
 
             {/* Admin Routes - Protected */}
             <Route path="/admin" element={<ProtectedRoute allowedRole="admin"><AdminDashboard /></ProtectedRoute>} />

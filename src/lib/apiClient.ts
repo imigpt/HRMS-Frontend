@@ -147,16 +147,38 @@ export const attendanceAPI = {
     api.post('/attendance/half-day-request', data),
 };
 
-// Task APIs
+// Task APIs – Enterprise Task Management System
 export const taskAPI = {
+  // Tasks
   getTasks: (params?: any) => api.get('/tasks', { params }),
+  getMyTasks: (params?: any) => api.get('/tasks/my', { params }),
+  getTeamTasks: (params?: any) => api.get('/tasks/team', { params }),
+  getAllTasks: (params?: any) => api.get('/tasks/all', { params }),
   createTask: (data: any) => api.post('/tasks', data),
   getTaskById: (id: string) => api.get(`/tasks/${id}`),
   updateTask: (id: string, data: any) => api.put(`/tasks/${id}`, data),
   deleteTask: (id: string) => api.delete(`/tasks/${id}`),
   updateProgress: (id: string, progress: number) =>
     api.put(`/tasks/${id}/progress`, { progress }),
-  getStatistics: (params?: any) => api.get('/tasks/statistics', { params }),
+
+  // Projects
+  getProjects: (params?: any) => api.get('/tasks/projects', { params }),
+  createProject: (data: any) => api.post('/tasks/projects', data),
+  getProjectById: (id: string) => api.get(`/tasks/projects/${id}`),
+  updateProject: (id: string, data: any) => api.put(`/tasks/projects/${id}`, data),
+  deleteProject: (id: string) => api.delete(`/tasks/projects/${id}`),
+
+  // Milestones
+  getMilestones: (projectId: string) => api.get(`/tasks/milestones/project/${projectId}`),
+  createMilestone: (data: any) => api.post('/tasks/milestones', data),
+  updateMilestone: (id: string, data: any) => api.put(`/tasks/milestones/${id}`, data),
+  deleteMilestone: (id: string) => api.delete(`/tasks/milestones/${id}`),
+
+  // Comments
+  addComment: (taskId: string, data: { content: string; mentions?: string[] }) =>
+    api.post(`/tasks/${taskId}/comments`, data),
+
+  // Attachments
   addAttachment: (id: string, file: File, fileType: string) => {
     const formData = new FormData();
     formData.append('attachment', file);
@@ -165,8 +187,56 @@ export const taskAPI = {
   },
   deleteAttachment: (taskId: string, attachmentId: string) =>
     api.delete(`/tasks/${taskId}/attachments/${attachmentId}`),
+
+  // Review
   addReview: (id: string, data: { comment: string; rating?: number }) =>
     api.put(`/tasks/${id}/review`, data),
+
+  // Workflow Transitions
+  transitionTask: (id: string, data: { action: string; comment?: string; overrideStatus?: string }) =>
+    api.put(`/tasks/${id}/transition`, data),
+  getAvailableTransitions: (id: string) =>
+    api.get(`/tasks/${id}/transitions`),
+
+  // Dependencies
+  addDependency: (taskId: string, data: { dependsOnId: string; type?: string }) =>
+    api.post(`/tasks/${taskId}/dependencies`, data),
+  removeDependency: (depId: string) =>
+    api.delete(`/tasks/dependencies/${depId}`),
+  getTaskDependencies: (taskId: string) =>
+    api.get(`/tasks/${taskId}/dependencies`),
+
+  // Time Tracking
+  logTime: (data: { taskId: string; duration: number; description?: string; date?: string }) =>
+    api.post('/tasks/timelog', data),
+  getTimeLogs: (params?: any) => api.get('/tasks/timelog', { params }),
+  startTimer: (taskId: string) => api.post('/tasks/timer/start', { taskId }),
+  stopTimer: (logId: string) => api.put(`/tasks/timer/stop/${logId}`),
+  getRunningTimer: () => api.get('/tasks/timer/running'),
+
+  // Analytics
+  getStatistics: (params?: any) => api.get('/tasks/statistics', { params }),
+  getProductivityAnalytics: (params?: any) => api.get('/tasks/analytics/productivity', { params }),
+  getWorkloadDistribution: (params?: any) => api.get('/tasks/analytics/workload', { params }),
+};
+
+// ─── Workflow Template APIs ────────────────────────────────────────────────
+export const workflowAPI = {
+  // Template CRUD
+  getTemplates: ()                       => api.get('/workflow-templates'),
+  getTemplateById: (id: string)          => api.get(`/workflow-templates/${id}`),
+  createTemplate: (data: any)            => api.post('/workflow-templates', data),
+  updateTemplate: (id: string, data: any) => api.put(`/workflow-templates/${id}`, data),
+  deleteTemplate: (id: string)           => api.delete(`/workflow-templates/${id}`),
+  duplicateTemplate: (id: string)        => api.post(`/workflow-templates/${id}/duplicate`),
+
+  // Task workflow operations
+  assignToTask: (taskId: string, data: { templateId?: string; workflowName: string; steps?: any[] }) =>
+    api.put(`/workflow-templates/task/${taskId}/assign`, data),
+  completeStep: (taskId: string, stepIndex: number, comment?: string) =>
+    api.put(`/workflow-templates/task/${taskId}/step/${stepIndex}/complete`, { comment }),
+  removeFromTask: (taskId: string) =>
+    api.delete(`/workflow-templates/task/${taskId}/workflow`),
 };
 
 // Expense APIs

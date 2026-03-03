@@ -1,587 +1,227 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Progress } from '@/components/ui/progress';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
-import {
-  ClipboardList, Plus, Eye, CheckCircle, Clock, AlertCircle, Trash2,
-  Calendar, Filter, Image, Video, FileText, Code, Loader2,
-  Download, Star, MessageSquare,
+  ClipboardList, Plus, CheckCircle, Clock, AlertCircle, AlertTriangle,
+  Filter, Loader2, LayoutList, Columns3, FolderKanban, Timer, Users, Search,
 } from 'lucide-react';
 import { hrAPI, taskAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
-import DocumentViewer from '@/components/ui/DocumentViewer';
-
-interface TaskAttachment {
-  _id?: string;
-  id?: string;
-  name: string;
-  type: 'image' | 'video' | 'document' | 'api';
-  url: string;
-  uploadedAt: string;
-}
-
-interface SubTask {
-  _id?: string;
-  id?: string;
-  title: string;
-  completed: boolean;
-}
-
-interface TaskReview {
-  comment: string;
-  rating?: number;
-  reviewedBy?: { _id?: string; name: string; employeeId?: string };
-  reviewedAt?: string;
-}
-
-interface Task {
-  _id: string;
-  id?: string;
-  title: string;
-  description: string;
-  assignedTo: {
-    _id?: string;
-    id?: string;
-    name: string;
-    email: string;
-    department?: string;
-  };
-  priority: 'low' | 'medium' | 'high';
-  status: 'todo' | 'in-progress' | 'completed' | 'cancelled';
-  progress: number;
-  dueDate: string;
-  createdDate: string;
-  createdBy: 'admin' | 'hr' | 'employee';
-  subTasks: SubTask[];
-  attachments: TaskAttachment[];
-  notes: string;
-  review?: TaskReview;
-}
+import TaskListView from '@/components/tasks/TaskListView';
+import TaskKanbanBoard from '@/components/tasks/TaskKanbanBoard';
+import TaskDetailDialog from '@/components/tasks/TaskDetailDialog';
+import TaskCreateDialog from '@/components/tasks/TaskCreateDialog';
+import TaskEditDialog from '@/components/tasks/TaskEditDialog';
+import ProjectManagement from '@/components/tasks/ProjectManagement';
+import TimeTracker from '@/components/tasks/TimeTracker';
+import { WorkflowDiagramButton } from '@/components/tasks/WorkflowDiagram';
+import { getInitials } from '@/components/tasks/task-helpers';
 
 const HRTasks = () => {
   const { toast } = useToast();
-  // Document viewer
-  const [viewerDoc, setViewerDoc] = useState<{ url: string; name: string } | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
-  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<any>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
-  const [creatorFilter, setCreatorFilter] = useState('all');
-  const [newTask, setNewTask] = useState({
-    title: '',
-    description: '',
-    employeeId: '',
-    priority: 'medium' as 'low' | 'medium' | 'high',
-    dueDate: '',
-  });
-  const [reviewData, setReviewData] = useState({ comment: '', rating: 0 });
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [activeTab, setActiveTab] = useState('list');
+  const [employeeFilter, setEmployeeFilter] = useState('all');
+  const [employeeSearch, setEmployeeSearch] = useState('');
+  const [editTask, setEditTask] = useState<any>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
-  const fetchTasks = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [tasksResponse, employeesResponse] = await Promise.all([
-        taskAPI.getTasks(),
+      const [tasksRes, employeesRes, projectsRes] = await Promise.all([
+        taskAPI.getTeamTasks(),
         hrAPI.getEmployees(),
+        taskAPI.getProjects(),
       ]);
-      setTasks(tasksResponse.data.data || []);
-      setEmployees(employeesResponse.data.data || []);
+      setTasks(tasksRes.data.data || []);
+      setEmployees(employeesRes.data.data || []);
+      setProjects(projectsRes.data.data || []);
     } catch (error: any) {
-      console.error('Failed to fetch tasks:', error);
-      toast({ title: 'Error', description: error.response?.data?.message || 'Failed to load tasks', variant: 'destructive' });
+      toast({ title: 'Error', description: error.response?.data?.message || 'Failed to load data', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   }, [toast]);
 
-  useEffect(() => { fetchTasks(); }, [fetchTasks]);
-
-  const handleCreateTask = async () => {
-    if (!newTask.title || !newTask.employeeId || !newTask.dueDate) {
-      toast({ title: 'Validation Error', description: 'Please fill all required fields', variant: 'destructive' });
-      return;
-    }
-    try {
-      await taskAPI.createTask({
-        title: newTask.title,
-        description: newTask.description,
-        assignedTo: newTask.employeeId,
-        priority: newTask.priority,
-        dueDate: newTask.dueDate,
-      });
-      toast({ title: 'Success', description: 'Task created successfully' });
-      setNewTask({ title: '', description: '', employeeId: '', priority: 'medium', dueDate: '' });
-      setIsCreateDialogOpen(false);
-      fetchTasks();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.response?.data?.message || 'Failed to create task', variant: 'destructive' });
-    }
-  };
-
-  const handleDeleteTask = async (taskId: string) => {
-    if (confirm('Are you sure you want to delete this task?')) {
-      try {
-        await taskAPI.deleteTask(taskId);
-        toast({ title: 'Success', description: 'Task deleted successfully' });
-        fetchTasks();
-      } catch (error: any) {
-        toast({ title: 'Error', description: error.response?.data?.message || 'Failed to delete task', variant: 'destructive' });
-      }
-    }
-  };
-
-  const handleSubmitReview = async () => {
-    if (!selectedTask || !reviewData.comment) {
-      toast({ title: 'Validation Error', description: 'Please enter a review comment', variant: 'destructive' });
-      return;
-    }
-    try {
-      await taskAPI.addReview(selectedTask._id, {
-        comment: reviewData.comment,
-        rating: reviewData.rating || undefined,
-      });
-      toast({ title: 'Success', description: 'Review submitted successfully' });
-      setIsReviewDialogOpen(false);
-      setReviewData({ comment: '', rating: 0 });
-      fetchTasks();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.response?.data?.message || 'Failed to submit review', variant: 'destructive' });
-    }
-  };
-
-  const handleDownload = (url: string, name: string) => {
-    const link = document.createElement('a');
-    link.href = url;
-    link.target = '_blank';
-    link.download = name;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const filteredTasks = tasks.filter(task => {
     const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
-    const matchesCreator = creatorFilter === 'all' || task.createdBy === creatorFilter;
-    return matchesStatus && matchesCreator;
+    const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter;
+    const assigneeId = typeof task.assignedTo === 'object' ? task.assignedTo?._id : task.assignedTo;
+    const matchesEmployee = employeeFilter === 'all' || assigneeId === employeeFilter;
+    return matchesStatus && matchesPriority && matchesEmployee;
   });
 
   const stats = {
     total: tasks.length,
-    completed: tasks.filter(t => t.status === 'completed').length,
+    pendingApproval: tasks.filter(t => t.status === 'pending-approval').length,
     inProgress: tasks.filter(t => t.status === 'in-progress').length,
-    todo: tasks.filter(t => t.status === 'todo').length,
+    completed: tasks.filter(t => t.status === 'completed').length,
+    overdue: tasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'completed' && t.status !== 'closed' && t.status !== 'rejected').length,
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'status-rejected';
-      case 'medium': return 'status-pending';
-      case 'low': return 'status-approved';
-      default: return 'bg-muted';
-    }
-  };
+  const handleViewTask = (task: any) => { setSelectedTask(task); setIsDetailOpen(true); };
+  const handleEditTask = (task: any) => { setEditTask(task); setIsEditOpen(true); };
+  const handleEditSave = () => { fetchData(); setIsEditOpen(false); setEditTask(null); };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'status-approved';
-      case 'in-progress': return 'status-in-progress';
-      case 'todo': return 'status-pending';
-      default: return 'bg-muted';
-    }
-  };
-
-  const getAttachmentIcon = (type: string) => {
-    switch (type) {
-      case 'image': return <Image className="h-4 w-4 text-primary" />;
-      case 'video': return <Video className="h-4 w-4 text-primary" />;
-      case 'document': return <FileText className="h-4 w-4 text-primary" />;
-      case 'api': return <Code className="h-4 w-4 text-primary" />;
-      default: return <FileText className="h-4 w-4 text-primary" />;
-    }
-  };
+  const filteredEmployees = employees.filter(emp =>
+    !employeeSearch || emp.name?.toLowerCase().includes(employeeSearch.toLowerCase()) || emp.employeeId?.toLowerCase().includes(employeeSearch.toLowerCase())
+  );
 
   return (
     <DashboardLayout>
-      {loading ? (
-        <div className="flex items-center justify-center h-96">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
+      {loading && tasks.length === 0 ? (
+        <div className="flex items-center justify-center h-96"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
       ) : (
       <div className="space-y-6 fade-in">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Task Management</h1>
-            <p className="text-muted-foreground">Create and track tasks assigned to employees</p>
+            <p className="text-muted-foreground">Manage and track team tasks</p>
           </div>
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="glow-button"><Plus className="h-4 w-4 mr-2" />Create Task</Button>
-            </DialogTrigger>
-            <DialogContent className="bg-background max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Create New Task</DialogTitle>
-                <DialogDescription>Assign a new task to an employee</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>Assign To</Label>
-                  <Select value={newTask.employeeId} onValueChange={(val) => setNewTask({ ...newTask, employeeId: val })}>
-                    <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
-                    <SelectContent>
-                      {employees.map(emp => (
-                        <SelectItem key={emp._id} value={emp._id}>
-                          {emp.name} - {emp.department || 'N/A'}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Task Title</Label>
-                  <Input placeholder="Enter task title" value={newTask.title} onChange={(e) => setNewTask({ ...newTask, title: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Textarea placeholder="Enter task description" rows={4} value={newTask.description} onChange={(e) => setNewTask({ ...newTask, description: e.target.value })} />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Priority</Label>
-                    <Select value={newTask.priority} onValueChange={(val: 'low' | 'medium' | 'high') => setNewTask({ ...newTask, priority: val })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Due Date</Label>
-                    <Input type="date" value={newTask.dueDate} onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })} />
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleCreateTask} disabled={!newTask.title || !newTask.employeeId || !newTask.dueDate}>Create Task</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <div className="flex items-center gap-2">
+            <WorkflowDiagramButton />
+            <Button className="glow-button" onClick={() => setIsCreateOpen(true)}><Plus className="h-4 w-4 mr-2" />Create Task</Button>
+          </div>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="glass-card card-hover"><CardContent className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center"><ClipboardList className="h-5 w-5 text-primary" /></div><div><p className="text-2xl font-bold text-foreground">{stats.total}</p><p className="text-xs text-muted-foreground">Total Tasks</p></div></div></CardContent></Card>
-          <Card className="glass-card card-hover"><CardContent className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-success/20 flex items-center justify-center"><CheckCircle className="h-5 w-5 text-success" /></div><div><p className="text-2xl font-bold text-foreground">{stats.completed}</p><p className="text-xs text-muted-foreground">Completed</p></div></div></CardContent></Card>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <Card className="glass-card card-hover"><CardContent className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center"><ClipboardList className="h-5 w-5 text-primary" /></div><div><p className="text-2xl font-bold text-foreground">{stats.total}</p><p className="text-xs text-muted-foreground">Total</p></div></div></CardContent></Card>
+          <Card className="glass-card card-hover"><CardContent className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-warning/20 flex items-center justify-center"><AlertCircle className="h-5 w-5 text-warning" /></div><div><p className="text-2xl font-bold text-foreground">{stats.pendingApproval}</p><p className="text-xs text-muted-foreground">Pending</p></div></div></CardContent></Card>
           <Card className="glass-card card-hover"><CardContent className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center"><Clock className="h-5 w-5 text-primary" /></div><div><p className="text-2xl font-bold text-foreground">{stats.inProgress}</p><p className="text-xs text-muted-foreground">In Progress</p></div></div></CardContent></Card>
-          <Card className="glass-card card-hover"><CardContent className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-warning/20 flex items-center justify-center"><AlertCircle className="h-5 w-5 text-warning" /></div><div><p className="text-2xl font-bold text-foreground">{stats.todo}</p><p className="text-xs text-muted-foreground">To Do</p></div></div></CardContent></Card>
+          <Card className="glass-card card-hover"><CardContent className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-success/20 flex items-center justify-center"><CheckCircle className="h-5 w-5 text-success" /></div><div><p className="text-2xl font-bold text-foreground">{stats.completed}</p><p className="text-xs text-muted-foreground">Completed</p></div></div></CardContent></Card>
+          <Card className="glass-card card-hover"><CardContent className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-destructive/20 flex items-center justify-center"><AlertTriangle className="h-5 w-5 text-destructive" /></div><div><p className="text-2xl font-bold text-foreground">{stats.overdue}</p><p className="text-xs text-muted-foreground">Overdue</p></div></div></CardContent></Card>
         </div>
 
-        {/* Filters */}
-        <Card className="glass-card">
-          <CardContent className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger><Filter className="h-4 w-4 mr-2" /><SelectValue placeholder="All Status" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="todo">To Do</SelectItem>
-                  <SelectItem value="in-progress">In Progress</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={creatorFilter} onValueChange={setCreatorFilter}>
-                <SelectTrigger><Filter className="h-4 w-4 mr-2" /><SelectValue placeholder="All Tasks" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Tasks</SelectItem>
-                  <SelectItem value="hr">HR Created</SelectItem>
-                  <SelectItem value="employee">Employee Created</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList>
+            <TabsTrigger value="list" className="gap-1.5"><LayoutList className="h-3.5 w-3.5" />List</TabsTrigger>
+            <TabsTrigger value="kanban" className="gap-1.5"><Columns3 className="h-3.5 w-3.5" />Kanban</TabsTrigger>
+            <TabsTrigger value="employees" className="gap-1.5"><Users className="h-3.5 w-3.5" />By Employee</TabsTrigger>
+            <TabsTrigger value="projects" className="gap-1.5"><FolderKanban className="h-3.5 w-3.5" />Projects</TabsTrigger>
+            <TabsTrigger value="time" className="gap-1.5"><Timer className="h-3.5 w-3.5" />Time Tracking</TabsTrigger>
+          </TabsList>
 
-        {/* Tasks Table */}
-        <Card className="glass-card">
-          <CardHeader><CardTitle>All Tasks</CardTitle></CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Task</TableHead>
-                  <TableHead>Assigned To</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Progress</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredTasks.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No tasks found.</TableCell></TableRow>
-                ) : (
-                  filteredTasks.map((task) => (
-                  <TableRow key={task._id || task.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{task.title}</p>
-                        <p className="text-xs text-muted-foreground line-clamp-1">{task.description}</p>
-                        <div className="flex items-center gap-1 mt-1">
-                          <Badge variant="outline" className="text-xs">
-                            {task.createdBy === 'hr' ? '👨‍💼 HR Created' : task.createdBy === 'admin' ? '🔑 Admin Created' : '👤 Employee Created'}
-                          </Badge>
-                          {task.review?.comment && <Badge variant="outline" className="text-xs gap-1"><Star className="h-3 w-3 text-yellow-500" />Reviewed</Badge>}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8"><AvatarFallback className="bg-primary/20 text-primary text-xs">{task.assignedTo?.name?.split(' ').map(n => n[0]).join('') || '?'}</AvatarFallback></Avatar>
-                        <div>
-                          <p className="font-medium text-sm">{task.assignedTo?.name || 'Unknown'}</p>
-                          <p className="text-xs text-muted-foreground">{task.assignedTo?.department || ''}</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell><Badge className={getPriorityColor(task.priority)}>{task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}</Badge></TableCell>
-                    <TableCell>
-                      <div className="space-y-1 min-w-[120px]">
-                        <div className="flex items-center justify-between text-xs"><span className="text-muted-foreground">Progress</span><span className="font-semibold">{task.progress}%</span></div>
-                        <Progress value={task.progress} className="h-1.5" />
-                      </div>
-                    </TableCell>
-                    <TableCell><div className="flex items-center gap-2 text-sm"><Calendar className="h-3 w-3 text-muted-foreground" />{new Date(task.dueDate).toLocaleDateString()}</div></TableCell>
-                    <TableCell><Badge className={getStatusColor(task.status)}>{task.status.charAt(0).toUpperCase() + task.status.slice(1).replace('-', ' ')}</Badge></TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => { setSelectedTask(task); setIsViewDialogOpen(true); }}><Eye className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="sm" onClick={() => { setSelectedTask(task); setReviewData({ comment: task.review?.comment || '', rating: task.review?.rating || 0 }); setIsReviewDialogOpen(true); }}><MessageSquare className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteTask(task._id || task.id!)}><Trash2 className="h-4 w-4" /></Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        {/* View Task Dialog */}
-        <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-          <DialogContent className="bg-background max-w-3xl max-h-[85vh] p-0">
-            <ScrollArea className="max-h-[85vh]">
-              <div className="p-6">
-              {selectedTask && (
-                <>
-                  <DialogHeader>
-                    <DialogTitle className="text-2xl">{selectedTask.title}</DialogTitle>
-                    <DialogDescription>{selectedTask.description}</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-6 py-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-muted-foreground">Assigned To</Label>
-                        <div className="flex items-center gap-3 mt-2">
-                          <Avatar><AvatarFallback className="bg-primary/20 text-primary">{selectedTask.assignedTo?.name?.split(' ').map(n => n[0]).join('') || '?'}</AvatarFallback></Avatar>
-                          <div>
-                            <p className="font-medium">{selectedTask.assignedTo?.name}</p>
-                            <p className="text-xs text-muted-foreground">{selectedTask.assignedTo?.department}</p>
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-muted-foreground">Department</Label>
-                        <p className="mt-2">{selectedTask.assignedTo?.department || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <Label className="text-muted-foreground">Priority</Label>
-                        <Badge className={`${getPriorityColor(selectedTask.priority)} mt-2`}>{selectedTask.priority.charAt(0).toUpperCase() + selectedTask.priority.slice(1)}</Badge>
-                      </div>
-                      <div>
-                        <Label className="text-muted-foreground">Status</Label>
-                        <Badge className={`${getStatusColor(selectedTask.status)} mt-2`}>{selectedTask.status.charAt(0).toUpperCase() + selectedTask.status.slice(1).replace('-', ' ')}</Badge>
-                      </div>
-                      <div>
-                        <Label className="text-muted-foreground">Due Date</Label>
-                        <p className="mt-2">{new Date(selectedTask.dueDate).toLocaleDateString()}</p>
-                      </div>
-                      <div>
-                        <Label className="text-muted-foreground">Created By</Label>
-                        <Badge variant="outline" className="mt-2 capitalize">{selectedTask.createdBy}</Badge>
-                      </div>
-                    </div>
-
-                    {/* Progress */}
-                    <div>
-                      <Label className="text-muted-foreground">Progress</Label>
-                      <div className="space-y-2 mt-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-2xl font-bold text-primary">{selectedTask.progress}%</span>
-                          <Badge className={getStatusColor(selectedTask.status)}>{selectedTask.status.replace('-', ' ').toUpperCase()}</Badge>
-                        </div>
-                        <Progress value={selectedTask.progress} className="h-3" />
-                      </div>
-                    </div>
-
-                    {/* Subtasks */}
-                    {selectedTask.subTasks && selectedTask.subTasks.length > 0 && (
-                      <div className="space-y-3">
-                        <Label className="text-muted-foreground">Subtasks ({selectedTask.subTasks.filter(st => st.completed).length}/{selectedTask.subTasks.length} completed)</Label>
-                        <div className="space-y-2">
-                          {selectedTask.subTasks.map((subTask) => (
-                            <div key={subTask._id || subTask.id} className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
-                              <input type="checkbox" checked={subTask.completed} readOnly className="h-4 w-4 rounded border-border" />
-                              <span className={subTask.completed ? 'line-through text-muted-foreground' : ''}>{subTask.title}</span>
-                              {subTask.completed && <Badge className="ml-auto status-approved text-xs">Done</Badge>}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Attachments with Download/View */}
-                    {selectedTask.attachments && selectedTask.attachments.length > 0 && (
-                      <div className="space-y-3">
-                        <Label className="text-muted-foreground">Files Uploaded ({selectedTask.attachments.length})</Label>
-                        <div className="space-y-2">
-                          {selectedTask.attachments.map((attachment) => (
-                            <div key={attachment._id || attachment.id} className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30 border border-border">
-                              <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
-                                {getAttachmentIcon(attachment.type)}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-sm truncate">{attachment.name}</p>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                  <Badge variant="outline" className="text-xs">{attachment.type.toUpperCase()}</Badge>
-                                  <span className="text-xs text-muted-foreground">{new Date(attachment.uploadedAt).toLocaleDateString()}</span>
-                                </div>
-                              </div>
-                              <div className="flex gap-1">
-                                {attachment.url && attachment.url !== '#' && (
-                                  <>
-                                    <Button variant="ghost" size="sm" title="View" onClick={() => setViewerDoc({ url: attachment.url, name: attachment.name })}><Eye className="h-4 w-4" /></Button>
-                                    <Button variant="ghost" size="sm" title="Download" onClick={() => handleDownload(attachment.url, attachment.name)}><Download className="h-4 w-4" /></Button>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Notes */}
-                    {selectedTask.notes && (
-                      <div className="space-y-2">
-                        <Label className="text-muted-foreground">Progress Notes</Label>
-                        <div className="p-4 rounded-lg bg-secondary/30 border border-border"><p className="text-sm whitespace-pre-wrap">{selectedTask.notes}</p></div>
-                      </div>
-                    )}
-
-                    {/* Existing Review */}
-                    {selectedTask.review?.comment && (
-                      <div className="space-y-2">
-                        <Label className="text-muted-foreground">Your Review</Label>
-                        <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                          {selectedTask.review.rating && (
-                            <div className="flex items-center gap-1 mb-2">
-                              {[1,2,3,4,5].map(i => (
-                                <Star key={i} className={`h-4 w-4 ${i <= selectedTask.review!.rating! ? 'text-yellow-500 fill-yellow-500' : 'text-muted-foreground'}`} />
-                              ))}
-                            </div>
-                          )}
-                          <p className="text-sm">{selectedTask.review.comment}</p>
-                          {selectedTask.review.reviewedBy && (
-                            <p className="text-xs text-muted-foreground mt-2">Reviewed by {selectedTask.review.reviewedBy.name}</p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Quick Review Button */}
-                    <Button className="w-full" variant="outline" onClick={() => { setReviewData({ comment: selectedTask.review?.comment || '', rating: selectedTask.review?.rating || 0 }); setIsViewDialogOpen(false); setIsReviewDialogOpen(true); }}>
-                      <MessageSquare className="h-4 w-4 mr-2" />{selectedTask.review?.comment ? 'Edit Review' : 'Add Review'}
-                    </Button>
-
-                    {/* Summary */}
-                    <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
-                      <div className="grid grid-cols-3 gap-4 text-center">
-                        <div><p className="text-2xl font-bold text-primary">{selectedTask.progress}%</p><p className="text-xs text-muted-foreground mt-1">Progress</p></div>
-                        <div><p className="text-2xl font-bold text-primary">{selectedTask.attachments?.length || 0}</p><p className="text-xs text-muted-foreground mt-1">Files</p></div>
-                        <div><p className="text-2xl font-bold text-primary">{selectedTask.subTasks?.length || 0}</p><p className="text-xs text-muted-foreground mt-1">Subtasks</p></div>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-              </div>
-            </ScrollArea>
-          </DialogContent>
-        </Dialog>
-
-        {/* Review Dialog */}
-        <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
-          <DialogContent className="bg-background max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Review Task: {selectedTask?.title}</DialogTitle>
-              <DialogDescription>Provide feedback on the employee's work</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Rating (optional)</Label>
-                <div className="flex items-center gap-1">
-                  {[1,2,3,4,5].map(i => (
-                    <button key={i} type="button" onClick={() => setReviewData({ ...reviewData, rating: i })} className="p-1 hover:scale-110 transition-transform">
-                      <Star className={`h-6 w-6 ${i <= reviewData.rating ? 'text-yellow-500 fill-yellow-500' : 'text-muted-foreground'}`} />
-                    </button>
-                  ))}
-                  {reviewData.rating > 0 && (
-                    <button type="button" onClick={() => setReviewData({ ...reviewData, rating: 0 })} className="ml-2 text-xs text-muted-foreground hover:text-foreground">Clear</button>
-                  )}
+          {/* List View */}
+          <TabsContent value="list" className="space-y-4 mt-4">
+            <Card className="glass-card">
+              <CardContent className="p-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger><Filter className="h-4 w-4 mr-2" /><SelectValue placeholder="All Status" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="draft">Draft</SelectItem><SelectItem value="pending-approval">Pending Approval</SelectItem>
+                      <SelectItem value="assigned">Assigned</SelectItem><SelectItem value="in-progress">In Progress</SelectItem>
+                      <SelectItem value="under-review">Under Review</SelectItem><SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="closed">Closed</SelectItem><SelectItem value="rejected">Rejected</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                    <SelectTrigger><Filter className="h-4 w-4 mr-2" /><SelectValue placeholder="All Priorities" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Priorities</SelectItem>
+                      <SelectItem value="critical">Critical</SelectItem><SelectItem value="high">High</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem><SelectItem value="low">Low</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={employeeFilter} onValueChange={setEmployeeFilter}>
+                    <SelectTrigger><Users className="h-4 w-4 mr-2" /><SelectValue placeholder="All Employees" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Employees</SelectItem>
+                      {employees.map(emp => (<SelectItem key={emp._id} value={emp._id}>{emp.name} ({emp.employeeId || ''})</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground"><Badge variant="outline">{filteredTasks.length} tasks</Badge></div>
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Review Comment *</Label>
-                <Textarea placeholder="Enter your feedback about this task..." rows={4} value={reviewData.comment} onChange={(e) => setReviewData({ ...reviewData, comment: e.target.value })} />
-              </div>
-            </div>
-            <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setIsReviewDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleSubmitReview} disabled={!reviewData.comment.trim()}>Submit Review</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-      )}
+              </CardContent>
+            </Card>
+            <Card className="glass-card">
+              <CardHeader><CardTitle>Team Tasks</CardTitle></CardHeader>
+              <CardContent>
+                <TaskListView tasks={filteredTasks} loading={loading} onViewTask={handleViewTask} onEditTask={handleEditTask} showAssignee={true} showProject={true} />
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-      {/* ── Document Viewer ── */}
-      {viewerDoc && (
-        <DocumentViewer
-          open={!!viewerDoc}
-          onClose={() => setViewerDoc(null)}
-          url={viewerDoc.url}
-          fileName={viewerDoc.name}
-        />
+          {/* Kanban */}
+          <TabsContent value="kanban" className="mt-4">
+            <TaskKanbanBoard tasks={filteredTasks} onViewTask={handleViewTask} showAssignee={true} />
+          </TabsContent>
+
+          {/* By Employee */}
+          <TabsContent value="employees" className="mt-4">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+              <Card className="glass-card lg:col-span-1">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2"><Users className="h-4 w-4 text-primary" />Employees</CardTitle>
+                  <div className="relative mt-2">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input placeholder="Search..." value={employeeSearch} onChange={e => setEmployeeSearch(e.target.value)} className="pl-8 h-8 text-xs" />
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="h-[500px]">
+                    <div className="px-3 pb-3 space-y-1">
+                      <button onClick={() => setEmployeeFilter('all')}
+                        className={`w-full flex items-center gap-2 p-2 rounded-lg text-xs transition-colors ${employeeFilter === 'all' ? 'bg-primary/20 text-primary font-semibold' : 'hover:bg-secondary/50'}`}>
+                        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">All</div>
+                        <span>All Employees</span>
+                        <Badge variant="outline" className="ml-auto text-[10px]">{tasks.length}</Badge>
+                      </button>
+                      {filteredEmployees.map(emp => {
+                        const empTasks = tasks.filter(t => { const id = typeof t.assignedTo === 'object' ? t.assignedTo?._id : t.assignedTo; return id === emp._id; });
+                        return (
+                          <button key={emp._id} onClick={() => setEmployeeFilter(emp._id)}
+                            className={`w-full flex items-center gap-2 p-2 rounded-lg text-xs transition-colors ${employeeFilter === emp._id ? 'bg-primary/20 text-primary font-semibold' : 'hover:bg-secondary/50'}`}>
+                            <Avatar className="h-7 w-7"><AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-primary text-[9px] font-bold">{getInitials(emp.name)}</AvatarFallback></Avatar>
+                            <div className="text-left min-w-0 flex-1">
+                              <p className="truncate">{emp.name}</p>
+                              <p className="text-[10px] text-muted-foreground">{emp.employeeId || emp.department || ''}</p>
+                            </div>
+                            <Badge variant="outline" className="text-[10px] flex-shrink-0">{empTasks.length}</Badge>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+              <Card className="glass-card lg:col-span-3">
+                <CardHeader><CardTitle className="text-sm">{employeeFilter === 'all' ? 'All Tasks' : `Tasks for ${employees.find(e => e._id === employeeFilter)?.name || 'Employee'}`}</CardTitle></CardHeader>
+                <CardContent>
+                  <TaskListView tasks={filteredTasks} loading={loading} onViewTask={handleViewTask} onEditTask={handleEditTask} showAssignee={employeeFilter === 'all'} showProject={true} />
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="projects" className="mt-4"><ProjectManagement showCreateButton={true} /></TabsContent>
+          <TabsContent value="time" className="mt-4"><TimeTracker tasks={tasks} /></TabsContent>
+        </Tabs>
+
+        <TaskCreateDialog open={isCreateOpen} onClose={() => setIsCreateOpen(false)} onCreated={fetchData} employees={employees} projects={projects} showAssignee={true} />
+        {editTask && <TaskEditDialog task={editTask} open={isEditOpen} onClose={() => { setIsEditOpen(false); setEditTask(null); }} onSaved={handleEditSave} employees={employees} projects={projects} />}
+        <TaskDetailDialog task={selectedTask} open={isDetailOpen} onClose={() => setIsDetailOpen(false)} onTaskUpdated={fetchData} canReview={true} canUpload={false} canComment={true} showAssignee={true} userRole="hr" employees={employees} />
+      </div>
       )}
     </DashboardLayout>
   );

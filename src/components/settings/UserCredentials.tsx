@@ -23,6 +23,7 @@ interface UserCredential {
   status: string;
   profilePhoto?: string;
   joinDate?: string;
+  lastSetPassword?: string;
 }
 
 const UserCredentials = () => {
@@ -41,6 +42,7 @@ const UserCredentials = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
 
   const { toast } = useToast();
 
@@ -142,7 +144,7 @@ const UserCredentials = () => {
           <Users className="h-5 w-5 text-primary" />
           User Credentials
         </CardTitle>
-        <CardDescription>View user accounts and manage passwords. You cannot view existing passwords — only reset them.</CardDescription>
+        <CardDescription>View user accounts and manage passwords. Passwords are shown only after being set/reset by admin.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Filters */}
@@ -178,8 +180,8 @@ const UserCredentials = () => {
                 <TableHead>User</TableHead>
                 <TableHead>Employee ID</TableHead>
                 <TableHead>Email</TableHead>
+                <TableHead>Password</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead>Department</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -214,10 +216,41 @@ const UserCredentials = () => {
                         <span className="font-medium text-sm">{user.name}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{user.employeeId || '-'}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="font-mono text-xs">{user.employeeId || '-'}</Badge>
+                    </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{user.email}</TableCell>
+                    <TableCell>
+                      {user.lastSetPassword ? (
+                        <div className="flex items-center gap-1.5">
+                          <code className="text-xs bg-secondary px-2 py-0.5 rounded font-mono">
+                            {visiblePasswords.has(user._id) ? user.lastSetPassword : '••••••••'}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={() => setVisiblePasswords(prev => {
+                              const next = new Set(prev);
+                              if (next.has(user._id)) next.delete(user._id);
+                              else next.add(user._id);
+                              return next;
+                            })}
+                            className="text-muted-foreground hover:text-foreground p-0.5"
+                          >
+                            {visiblePasswords.has(user._id) ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(user.lastSetPassword!)}
+                            className="text-muted-foreground hover:text-foreground p-0.5"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">Not set by admin</span>
+                      )}
+                    </TableCell>
                     <TableCell>{getRoleBadge(user.role)}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{user.department || '-'}</TableCell>
                     <TableCell>{getStatusBadge(user.status)}</TableCell>
                     <TableCell className="text-right">
                       <Button

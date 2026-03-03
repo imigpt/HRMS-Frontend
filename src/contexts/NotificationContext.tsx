@@ -101,9 +101,9 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
     const result: AppNotification[] = [];
     const isRead = (id: string) => readIds.has(id);
 
-    const leaveLink = userRole === 'hr' ? '/hr/leaves' : userRole === 'admin' ? '/admin/leaves' : '/employee/leave';
-    const expLink   = userRole === 'hr' ? '/hr/expenses' : userRole === 'admin' ? '/admin/expenses' : '/employee/expenses';
-    const attLink   = userRole === 'hr' ? '/hr/attendance-requests' : '/employee/attendance';
+    const leaveLink = userRole === 'admin' ? '/admin/leaves' : userRole === 'hr' ? '/hr/leaves' : userRole === 'client' ? '/client/leaves' : '/employee/leave';
+    const expLink = userRole === 'admin' ? '/admin/expenses' : userRole === 'hr' ? '/hr/expenses' : userRole === 'client' ? '/client/expenses' : '/employee/expenses';
+    const attLink = userRole === 'admin' ? '/admin/attendance' : userRole === 'hr' ? '/hr/attendance' : userRole === 'client' ? '/client/attendance' : '/employee/attendance';
 
     // ── 1. Announcements (all roles) ─────────────────────────────────────────
     try {
@@ -173,72 +173,93 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
       // console.debug('NotificationContext chat unread error', err);
     }
 
-    // ── 3. Leave decisions (employee & HR) ───────────────────────────────────
-    if (userRole === 'employee' || userRole === 'hr') {
-      try {
-        const res = await leaveAPI.getLeaves({ limit: 20 });
-        const leaves: any[] = safeArray(res, 'data', 'leaves');
-        leaves
-          .filter((l: any) => l.status === 'approved' || l.status === 'rejected')
-          .slice(0, 5)
-          .forEach((l: any) => {
-            const id = `leave_${l._id}_${l.status}`;
-            result.push({
-              id,
-              type: l.status === 'approved' ? 'leave_approved' : 'leave_rejected',
-              title: l.status === 'approved' ? '✅ Leave Approved' : '❌ Leave Rejected',
-              message: `Your ${l.leaveType || 'leave'} request (${
-                l.startDate ? new Date(l.startDate).toLocaleDateString() : '—'
-              }) was ${l.status}`,
-              time: l.updatedAt || l.createdAt || new Date().toISOString(),
-              read: isRead(id),
-              link: leaveLink,
-            });
+    // ── 3. Leave decisions (show to all roles) ──────────────────────────────
+    try {
+      // Admins should use the admin API to receive company-wide leave decisions
+      const res = (userRole === 'admin' ? await adminAPI.getLeaves({ limit: 20 }).catch(() => null) : await leaveAPI.getLeaves({ limit: 20 }).catch(() => null));
+      const leaves: any[] = safeArray(res, 'data', 'leaves');
+      leaves
+        .filter((l: any) => l.status === 'approved' || l.status === 'rejected')
+        .slice(0, 5)
+        .forEach((l: any) => {
+          const id = `leave_${l._id}_${l.status}`;
+          result.push({
+            id,
+            type: l.status === 'approved' ? 'leave_approved' : 'leave_rejected',
+            title: l.status === 'approved' ? '✅ Leave Approved' : '❌ Leave Rejected',
+            message: `${l.user?.name ? `${l.user.name}'s` : 'A'} ${l.leaveType || 'leave'} request (${l.startDate ? new Date(l.startDate).toLocaleDateString() : '—'}) was ${l.status}`,
+            time: l.updatedAt || l.createdAt || new Date().toISOString(),
+            read: isRead(id),
+            link: leaveLink,
           });
-      } catch { /* silent */ }
+        });
+    } catch { /* silent */ }
 
-      // ── 4. Expense decisions ─────────────────────────────────────────────
-      try {
-        const res = await expenseAPI.getExpenses({ limit: 20 });
-        const expenses: any[] = safeArray(res, 'data', 'expenses');
-        expenses
-          .filter((e: any) => e.status === 'approved' || e.status === 'rejected')
-          .slice(0, 5)
-          .forEach((e: any) => {
-            const id = `exp_${e._id}_${e.status}`;
-            result.push({
-              id,
-              type: e.status === 'approved' ? 'expense_approved' : 'expense_rejected',
-              title: e.status === 'approved' ? '✅ Expense Approved' : '❌ Expense Rejected',
-              message: `Your expense "${e.title || e.description || 'request'}" was ${e.status}`,
-              time: e.updatedAt || e.createdAt || new Date().toISOString(),
-              read: isRead(id),
-              link: expLink,
-            });
+    // ── 4. Expense decisions (show to all roles) ────────────────────────────
+    try {
+      const res = await expenseAPI.getExpenses({ limit: 20 }).catch(() => null);
+      const expenses: any[] = safeArray(res, 'data', 'expenses');
+      expenses
+        .filter((e: any) => e.status === 'approved' || e.status === 'rejected')
+        .slice(0, 5)
+        .forEach((e: any) => {
+          const id = `exp_${e._id}_${e.status}`;
+          result.push({
+            id,
+            type: e.status === 'approved' ? 'expense_approved' : 'expense_rejected',
+            title: e.status === 'approved' ? '✅ Expense Approved' : '❌ Expense Rejected',
+            message: `${e.user?.name ? `${e.user.name}'s` : 'An'} expense "${e.title || e.description || 'request'}" was ${e.status}`,
+            time: e.updatedAt || e.createdAt || new Date().toISOString(),
+            read: isRead(id),
+            link: expLink,
           });
-      } catch { /* silent */ }
+        });
+    } catch { /* silent */ }
 
-      // ── 5. Attendance edit outcomes ──────────────────────────────────────
-      try {
-        const res = await attendanceAPI.getMyEditRequests();
-        const edits: any[] = safeArray(res, 'data', 'requests', 'editRequests');
-        edits
-          .filter((r: any) => r.status === 'approved' || r.status === 'rejected')
-          .slice(0, 5)
-          .forEach((r: any) => {
-            const id = `attedit_${r._id}_${r.status}`;
-            result.push({
-              id,
-              type: r.status === 'approved' ? 'attendance_edit_approved' : 'attendance_edit_rejected',
-              title: r.status === 'approved' ? '✅ Attendance Edit Approved' : '❌ Attendance Edit Rejected',
-              message: `Your attendance correction was ${r.status}`,
-              time: r.reviewedAt || r.updatedAt || r.createdAt || new Date().toISOString(),
-              read: isRead(id),
-              link: attLink,
-            });
+    // ── 5. Attendance edit outcomes (show to all roles) ─────────────────────
+    try {
+      // Employees get their own edit request outcomes; admins/HR should also see pending edit requests
+      const personalRes = await attendanceAPI.getMyEditRequests().catch(() => null);
+      const personalEdits: any[] = safeArray(personalRes, 'data', 'requests', 'editRequests');
+
+      // For admin/hr, also pull pending edit requests so they have actionable notifications
+      let pendingEdits: any[] = [];
+      if (userRole === 'admin' || userRole === 'hr') {
+        const pend = await attendanceAPI.getPendingEditRequests().catch(() => null);
+        pendingEdits = safeArray(pend, 'data', 'requests', 'editRequests');
+      }
+
+      // Show approvals/rejections from personal edits
+      personalEdits
+        .filter((r: any) => r.status === 'approved' || r.status === 'rejected')
+        .slice(0, 5)
+        .forEach((r: any) => {
+          const id = `attedit_${r._id}_${r.status}`;
+          result.push({
+            id,
+            type: r.status === 'approved' ? 'attendance_edit_approved' : 'attendance_edit_rejected',
+            title: r.status === 'approved' ? '✅ Attendance Edit Approved' : '❌ Attendance Edit Rejected',
+            message: `${r.user?.name ? `${r.user.name}'s` : 'An'} attendance correction was ${r.status}`,
+            time: r.reviewedAt || r.updatedAt || r.createdAt || new Date().toISOString(),
+            read: isRead(id),
+            link: attLink,
           });
-      } catch { /* silent */ }
-    }
+        });
+
+      // Show pending edits to admin/hr for action
+      pendingEdits.slice(0, 5).forEach((r: any) => {
+        const id = `pending_attedit_${r._id}`;
+        result.push({
+          id,
+          type: 'attendance_edit_pending',
+          title: '📋 Attendance Edit Request',
+          message: `${r.user?.name || 'An employee'} requested attendance correction`,
+          time: r.createdAt || new Date().toISOString(),
+          read: isRead(id),
+          link: attLink,
+        });
+      });
+    } catch { /* silent */ }
 
     // ── 6. HR/Admin: pending items awaiting action ───────────────────────────
     if (userRole === 'hr' || userRole === 'admin') {
@@ -277,60 +298,55 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
       } catch { /* silent */ }
     }
 
-    // ── 7. Task notifications (employee / hr / admin only) ─────────────────
-    if (userRole !== 'client') {
-    const taskLink = userRole === 'admin' ? '/admin/tasks' : userRole === 'hr' ? '/hr/tasks' : '/employee/tasks';
+    // ── 7. Task notifications (show to all roles) ─────────────────────────
+    const taskLink = userRole === 'admin' ? '/admin/tasks' : userRole === 'hr' ? '/hr/tasks' : userRole === 'client' ? '/client/tasks' : '/employee/tasks';
     try {
-      const res = await taskAPI.getTasks();
+      // Admins should use adminAPI to receive company-wide task notifications
+      const res = (userRole === 'admin' ? await adminAPI.getTasks().catch(() => null) : await taskAPI.getTasks().catch(() => null));
       const tasks: any[] = safeArray(res, 'data', 'tasks');
 
-      if (userRole === 'employee') {
-        // Employee: notify about tasks assigned (recently created)
-        tasks.slice(0, 5).forEach((t: any) => {
-          const id = `task_assigned_${t._id}`;
-          result.push({
-            id,
-            type: 'task_assigned',
-            title: '📋 New Task Assigned',
-            message: `"${t.title}" — Priority: ${t.priority}, Due: ${t.dueDate ? new Date(t.dueDate).toLocaleDateString() : 'N/A'}`,
-            time: t.createdAt || t.createdDate || new Date().toISOString(),
-            read: isRead(id),
-            link: taskLink,
-          });
+      // Recent tasks
+      tasks.slice(0, 5).forEach((t: any) => {
+        const id = `task_assigned_${t._id}`;
+        result.push({
+          id,
+          type: 'task_assigned',
+          title: '📋 Task',
+          message: `"${t.title}" — Priority: ${t.priority || 'N/A'}`,
+          time: t.createdAt || t.createdDate || new Date().toISOString(),
+          read: isRead(id),
+          link: taskLink,
         });
+      });
 
-        // Employee: notify about reviews on their tasks
-        tasks.filter((t: any) => t.review?.comment).slice(0, 5).forEach((t: any) => {
-          const id = `task_reviewed_${t._id}`;
-          result.push({
-            id,
-            type: 'task_reviewed',
-            title: '⭐ Task Reviewed',
-            message: `Your task "${t.title}" received a review${t.review.rating ? ` (${t.review.rating}/5)` : ''}`,
-            time: t.review.reviewedAt || t.updatedAt || new Date().toISOString(),
-            read: isRead(id),
-            link: taskLink,
-          });
+      // Task reviews
+      tasks.filter((t: any) => t.review?.comment).slice(0, 5).forEach((t: any) => {
+        const id = `task_reviewed_${t._id}`;
+        result.push({
+          id,
+          type: 'task_reviewed',
+          title: '⭐ Task Reviewed',
+          message: `Task "${t.title}" received a review${t.review.rating ? ` (${t.review.rating}/5)` : ''}`,
+          time: t.review.reviewedAt || t.updatedAt || new Date().toISOString(),
+          read: isRead(id),
+          link: taskLink,
         });
-      }
+      });
 
-      if (userRole === 'hr' || userRole === 'admin') {
-        // HR/Admin: notify about tasks with progress updates
-        tasks.filter((t: any) => t.progress > 0 && t.status !== 'completed').slice(0, 5).forEach((t: any) => {
-          const id = `task_progress_${t._id}_${t.progress}`;
-          result.push({
-            id,
-            type: 'task_progress',
-            title: '📊 Task Progress Updated',
-            message: `"${t.title}" — ${t.assignedTo?.name || 'Employee'} updated progress to ${t.progress}%`,
-            time: t.updatedAt || new Date().toISOString(),
-            read: isRead(id),
-            link: taskLink,
-          });
+      // Task progress
+      tasks.filter((t: any) => t.progress > 0 && t.status !== 'completed').slice(0, 5).forEach((t: any) => {
+        const id = `task_progress_${t._id}_${t.progress}`;
+        result.push({
+          id,
+          type: 'task_progress',
+          title: '📊 Task Progress Updated',
+          message: `"${t.title}" — ${t.assignedTo?.name || 'Employee'} updated progress to ${t.progress}%`,
+          time: t.updatedAt || new Date().toISOString(),
+          read: isRead(id),
+          link: taskLink,
         });
-      }
+      });
     } catch { /* silent */ }
-    } // end userRole !== 'client'
 
     // Sort newest first
     result.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());

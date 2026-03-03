@@ -4,6 +4,7 @@ export interface User {
   _id: string;
   name: string;
   email: string;
+  employeeId?: string;
   role: 'admin' | 'hr' | 'employee' | 'client';
   company?: Company | string;
   department?: string;
@@ -53,18 +54,183 @@ export interface Leave {
   createdAt?: string;
 }
 
+// ── Enterprise Task Management Types ──
+
+export interface Project {
+  _id: string;
+  name: string;
+  description?: string;
+  company: Company | string;
+  department?: string;
+  status: 'planning' | 'active' | 'on-hold' | 'completed' | 'cancelled';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  startDate?: string;
+  endDate?: string;
+  owner: User | string;
+  members: { user: User | string; role: string; addedAt: string }[];
+  tags: string[];
+  color?: string;
+  createdBy: User | string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Milestone {
+  _id: string;
+  title: string;
+  description?: string;
+  project: Project | string;
+  company: Company | string;
+  status: 'pending' | 'in-progress' | 'completed';
+  startDate?: string;
+  dueDate?: string;
+  completedAt?: string;
+  progress: number;
+  createdBy: User | string;
+  createdAt?: string;
+}
+
+export interface TaskComment {
+  _id?: string;
+  user: User | string;
+  content: string;
+  mentions: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface TaskAttachment {
+  _id?: string;
+  name: string;
+  type: 'image' | 'video' | 'document' | 'api';
+  url: string;
+  publicId?: string;
+  size?: number;
+  uploadedBy: User | string;
+  createdAt?: string;
+}
+
+export interface TaskActivity {
+  _id?: string;
+  user: User | string;
+  action: string;
+  details?: string;
+  oldValue?: string;
+  newValue?: string;
+  createdAt?: string;
+}
+
+export interface TaskReview {
+  comment: string;
+  rating?: number;
+  reviewedBy?: User | string;
+  reviewedAt?: string;
+}
+
+export type TaskStatus = 'draft' | 'pending-approval' | 'assigned' | 'in-progress' | 'under-review' | 'completed' | 'closed' | 'rejected';
+
+export interface WorkflowHistoryEntry {
+  _id?: string;
+  action: string;
+  fromStatus: string;
+  toStatus: string;
+  performedBy: User | string;
+  performedByRole?: string;
+  comment?: string;
+  timestamp?: string;
+}
+
+export interface WorkflowTransition {
+  action: string;
+  label: string;
+  toStatus: string | null;
+}
+
 export interface Task {
   _id: string;
   title: string;
   description?: string;
+  project?: Project | string;
+  milestone?: Milestone | string;
+  parentTask?: Task | string;
   assignedTo: User | string;
   assignedBy: User | string;
   company: Company | string;
+  department?: string;
   dueDate?: string;
-  priority: 'low' | 'medium' | 'high';
-  status: 'todo' | 'in-progress' | 'completed';
-  progress?: number;
+  startDate?: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  status: TaskStatus;
+  progress: number;
+  tags: string[];
+  estimatedTime?: number;
+  actualTime?: number;
+  comments: TaskComment[];
+  attachments: TaskAttachment[];
+  activityLog: TaskActivity[];
+  review?: TaskReview;
+  childTasks?: Task[];
+  // Workflow fields
+  workflowHistory?: WorkflowHistoryEntry[];
+  approvedBy?: User | string;
+  reviewedBy?: User | string;
+  submittedAt?: string;
+  approvedAt?: string;
+  assignedAt?: string;
+  workStartedAt?: string;
+  reviewSubmittedAt?: string;
+  reviewCompletedAt?: string;
+  closedAt?: string;
+  rejectedAt?: string;
   createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface TimeLog {
+  _id: string;
+  task: Task | string;
+  user: User | string;
+  company: Company | string;
+  description?: string;
+  duration: number;
+  date: string;
+  startTime?: string;
+  endTime?: string;
+  isRunning: boolean;
+  logType: 'manual' | 'timer';
+  createdAt?: string;
+}
+
+export interface TaskDependency {
+  _id: string;
+  task: Task | string;
+  dependsOn: Task | string;
+  type: 'finish-to-start' | 'start-to-start';
+  company: Company | string;
+  createdBy: User | string;
+}
+
+export interface ProductivityScore {
+  _id: string;
+  user: User | string;
+  company: Company | string;
+  period: 'daily' | 'weekly' | 'monthly';
+  periodStart: string;
+  periodEnd: string;
+  scores: {
+    completionRate: number;
+    onTimeDelivery: number;
+    timeEfficiency: number;
+    qualityScore: number;
+  };
+  overallScore: number;
+  stats: {
+    tasksAssigned: number;
+    tasksCompleted: number;
+    tasksOverdue: number;
+    totalEstimatedMinutes: number;
+    totalActualMinutes: number;
+  };
 }
 
 export interface Expense {

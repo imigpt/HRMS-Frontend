@@ -673,15 +673,27 @@ const ChatModule = ({ role }: ChatModuleProps) => {
   const filteredRooms = rooms.filter(room => {
     const searchLower = searchQuery.toLowerCase();
     if (room.type === 'personal' && room.otherUser) {
-      return room.otherUser.name?.toLowerCase().includes(searchLower);
+      const name = room.otherUser.name?.toLowerCase() || '';
+      const empId = (room.otherUser as any).employeeId?.toLowerCase() || '';
+      return name.includes(searchLower) || empId.includes(searchLower);
     }
     return room.name?.toLowerCase().includes(searchLower);
   });
 
+  // Display name helper — admin sees "Name (EmpID)", others see only "EmpID"
+  const getDisplayName = (u: any) => {
+    if (!u) return 'Unknown';
+    const empId = u.employeeId || '';
+    if (role === 'admin') {
+      return empId ? `${u.name || 'Unknown'} (${empId})` : (u.name || 'Unknown');
+    }
+    return empId || u.name || 'Unknown';
+  };
+
   // Get display name for room
   const getRoomName = (room: ChatRoom) => {
     if (room.type === 'personal' && room.otherUser) {
-      return room.otherUser.name || 'Unknown User';
+      return getDisplayName(room.otherUser);
     }
     return room.name || 'Group';
   };
@@ -808,11 +820,11 @@ const ChatModule = ({ role }: ChatModuleProps) => {
                             <Avatar>
                               <AvatarImage src={u.avatar} />
                               <AvatarFallback className="bg-primary/20 text-primary">
-                                {getInitials(u.name)}
+                                {getInitials(getDisplayName(u))}
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex-1">
-                              <p className="font-medium">{u.name}</p>
+                              <p className="font-medium">{getDisplayName(u)}</p>
                               <p className="text-xs text-muted-foreground capitalize">
                                 {u.role === 'client' ? `Client${u.companyName ? ` · ${u.companyName}` : ''}` : (u.position || u.role)}
                               </p>
@@ -874,11 +886,11 @@ const ChatModule = ({ role }: ChatModuleProps) => {
                                 />
                                 <Avatar className="h-8 w-8">
                                   <AvatarFallback className="text-xs bg-primary/20 text-primary">
-                                    {getInitials(u.name)}
+                                    {getInitials(getDisplayName(u))}
                                   </AvatarFallback>
                                 </Avatar>
                                 <div className="flex-1">
-                                  <span className="text-sm">{u.name}</span>
+                                  <span className="text-sm">{getDisplayName(u)}</span>
                                   {u.role === 'client' && (
                                     <Badge variant="outline" className="ml-2 text-xs py-0 px-1 border-orange-400 text-orange-500">
                                       Client
@@ -1103,7 +1115,7 @@ const ChatModule = ({ role }: ChatModuleProps) => {
                             >
                               {!isMe && selectedRoom.type === 'group' && (
                                 <p className="text-xs font-medium mb-1 opacity-80">
-                                  {sender?.name}
+                                  {getDisplayName(sender)}
                                 </p>
                               )}
                               {msg.isDeleted ? (
@@ -1285,12 +1297,12 @@ const ChatModule = ({ role }: ChatModuleProps) => {
                         <Avatar className="h-10 w-10">
                           <AvatarImage src={m.avatar} />
                           <AvatarFallback className="bg-primary/20 text-primary">
-                            {getInitials(m.name)}
+                            {getInitials(getDisplayName(m))}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1">
                           <p className="font-medium">
-                            {m.name} {isSelf && '(You)'}
+                            {getDisplayName(m)} {isSelf && '(You)'}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {m.position || m.role}
@@ -1341,10 +1353,10 @@ const ChatModule = ({ role }: ChatModuleProps) => {
                     />
                     <Avatar className="h-8 w-8">
                       <AvatarFallback className="text-xs bg-primary/20 text-primary">
-                        {getInitials(u.name)}
+                        {getInitials(getDisplayName(u))}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="text-sm">{u.name}</span>
+                    <span className="text-sm">{getDisplayName(u)}</span>
                   </div>
                 ))}
             </ScrollArea>
