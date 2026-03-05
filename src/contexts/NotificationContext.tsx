@@ -105,8 +105,8 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
     const expLink = userRole === 'admin' ? '/admin/expenses' : userRole === 'hr' ? '/hr/expenses' : userRole === 'client' ? '/client/expenses' : '/employee/expenses';
     const attLink = userRole === 'admin' ? '/admin/attendance' : userRole === 'hr' ? '/hr/attendance' : userRole === 'client' ? '/client/attendance' : '/employee/attendance';
 
-    // ── 1. Announcements (all roles) ─────────────────────────────────────────
-    try {
+    // ── 1. Announcements (non-client roles only) ───────────────────────────
+    if (userRole !== 'client') { try {
       const res = await announcementAPI.getAnnouncements({ limit: 10 });
       const announcements: any[] = safeArray(res, 'data', 'announcements');
       const annLink =
@@ -128,6 +128,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
         });
       });
     } catch { /* silent */ }
+    } // end announcements non-client guard
 
     // ── 2. Chat unread count (all roles) ─────────────────────────────────────
     try {
@@ -173,8 +174,8 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
       // console.debug('NotificationContext chat unread error', err);
     }
 
-    // ── 3. Leave decisions (show to all roles) ──────────────────────────────
-    try {
+    // ── 3. Leave decisions (non-client roles only) ─────────────────────────
+    if (userRole !== 'client') { try {
       // Admins should use the admin API to receive company-wide leave decisions
       const res = (userRole === 'admin' ? await adminAPI.getLeaves({ limit: 20 }).catch(() => null) : await leaveAPI.getLeaves({ limit: 20 }).catch(() => null));
       const leaves: any[] = safeArray(res, 'data', 'leaves');
@@ -194,9 +195,10 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
           });
         });
     } catch { /* silent */ }
+    } // end leave non-client guard
 
-    // ── 4. Expense decisions (show to all roles) ────────────────────────────
-    try {
+    // ── 4. Expense decisions (non-client roles only)
+    if (userRole !== 'client') { try {
       const res = await expenseAPI.getExpenses({ limit: 20 }).catch(() => null);
       const expenses: any[] = safeArray(res, 'data', 'expenses');
       expenses
@@ -215,9 +217,10 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
           });
         });
     } catch { /* silent */ }
+    } // end expense non-client guard
 
-    // ── 5. Attendance edit outcomes (show to all roles) ─────────────────────
-    try {
+    // ── 5. Attendance edit outcomes (non-client roles only)
+    if (userRole !== 'client') { try {
       // Employees get their own edit request outcomes; admins/HR should also see pending edit requests
       const personalRes = await attendanceAPI.getMyEditRequests().catch(() => null);
       const personalEdits: any[] = safeArray(personalRes, 'data', 'requests', 'editRequests');
@@ -260,6 +263,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
         });
       });
     } catch { /* silent */ }
+    } // end attendance non-client guard
 
     // ── 6. HR/Admin: pending items awaiting action ───────────────────────────
     if (userRole === 'hr' || userRole === 'admin') {
@@ -298,8 +302,8 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
       } catch { /* silent */ }
     }
 
-    // ── 7. Task notifications (show to all roles) ─────────────────────────
-    const taskLink = userRole === 'admin' ? '/admin/tasks' : userRole === 'hr' ? '/hr/tasks' : userRole === 'client' ? '/client/tasks' : '/employee/tasks';
+    // ── 7. Task notifications (non-client roles only) ──────────────────────
+    if (userRole !== 'client') { const taskLink = userRole === 'admin' ? '/admin/tasks' : userRole === 'hr' ? '/hr/tasks' : userRole === 'client' ? '/client/tasks' : '/employee/tasks';
     try {
       // Admins should use adminAPI to receive company-wide task notifications
       const res = (userRole === 'admin' ? await adminAPI.getTasks().catch(() => null) : await taskAPI.getTasks().catch(() => null));
@@ -346,7 +350,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
           link: taskLink,
         });
       });
-    } catch { /* silent */ }
+    } catch { /* silent */ } } // end task non-client guard
 
     // Sort newest first
     result.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());

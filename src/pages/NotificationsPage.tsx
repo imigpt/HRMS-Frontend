@@ -23,6 +23,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useNotifications, AppNotification, NotificationType } from '@/contexts/NotificationContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 const typeConfig: Record<
   NotificationType,
@@ -118,8 +119,17 @@ type FilterType = 'all' | 'unread' | 'task' | 'leave' | 'expense' | 'attendance'
 
 const NotificationsPage = () => {
   const navigate = useNavigate();
-  const { notifications, unreadCount, loading, markAsRead, markAllRead, refresh } =
+  const { notifications: allNotifications, unreadCount: rawUnreadCount, loading, markAsRead, markAllRead, refresh } =
     useNotifications();
+  const { userRole } = useAuth();
+  const isClient = userRole === 'client';
+
+  // Client role: only chat notifications are shown
+  const notifications = isClient
+    ? allNotifications.filter((n) => n.type === 'chat')
+    : allNotifications;
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
   const [filter, setFilter] = useState<FilterType>('all');
 
   const filtered = notifications.filter((n) => {
@@ -137,7 +147,13 @@ const NotificationsPage = () => {
     if (n.link) navigate(n.link);
   };
 
-  const filterButtons: { key: FilterType; label: string }[] = [
+  const filterButtons: { key: FilterType; label: string }[] = isClient
+    ? [
+        { key: 'all', label: 'All' },
+        { key: 'unread', label: `Unread (${unreadCount})` },
+        { key: 'chat', label: 'Chat' },
+      ]
+    : [
     { key: 'all', label: 'All' },
     { key: 'unread', label: `Unread (${unreadCount})` },
     { key: 'announcement', label: 'Announcements' },
@@ -177,7 +193,7 @@ const NotificationsPage = () => {
         </div>
 
         {/* Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className={`grid gap-4 ${isClient ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-5'}`}>
           <Card className="glass-card">
             <CardContent className="p-4 flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
@@ -200,45 +216,49 @@ const NotificationsPage = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="glass-card">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-success/20 flex items-center justify-center">
-                <CheckCircle className="h-5 w-5 text-success" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">
-                  {notifications.filter((n) => n.type.includes('approved')).length}
-                </p>
-                <p className="text-xs text-muted-foreground">Approvals</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="glass-card">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-destructive/20 flex items-center justify-center">
-                <XCircle className="h-5 w-5 text-destructive" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">
-                  {notifications.filter((n) => n.type.includes('rejected')).length}
-                </p>
-                <p className="text-xs text-muted-foreground">Rejections</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="glass-card">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center">
-                <ClipboardList className="h-5 w-5 text-orange-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">
-                  {notifications.filter((n) => n.type.startsWith('task_')).length}
-                </p>
-                <p className="text-xs text-muted-foreground">Tasks</p>
-              </div>
-            </CardContent>
-          </Card>
+          {!isClient && (
+            <>
+              <Card className="glass-card">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-success/20 flex items-center justify-center">
+                    <CheckCircle className="h-5 w-5 text-success" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">
+                      {notifications.filter((n) => n.type.includes('approved')).length}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Approvals</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="glass-card">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-destructive/20 flex items-center justify-center">
+                    <XCircle className="h-5 w-5 text-destructive" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">
+                      {notifications.filter((n) => n.type.includes('rejected')).length}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Rejections</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="glass-card">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center">
+                    <ClipboardList className="h-5 w-5 text-orange-400" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">
+                      {notifications.filter((n) => n.type.startsWith('task_')).length}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Tasks</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </div>
 
         {/* Filter Tabs */}
