@@ -60,8 +60,10 @@ const adminNavItems: NavItem[] = [
   { title: 'HR Accounts', href: '/admin/hr-accounts', icon: Users },
   { title: 'Employees', href: '/admin/employees', icon: UserCircle },
   { title: 'Clients', href: '/admin/clients', icon: UserCheck },
-  { title: 'Attendance', href: '/admin/attendance', icon: Clock },
-  { title: 'Edit Requests', href: '/admin/attendance-requests', icon: FileEdit },
+  { title: 'Attendance', href: '/admin/attendance', icon: Clock, children: [
+    { title: 'Attendance', href: '/admin/attendance', icon: Clock },
+    { title: 'Edit Requests', href: '/admin/attendance-requests', icon: FileEdit },
+  ]},
   { title: 'Leaves', href: '/admin/leaves', icon: CalendarCheck, children: [
     { title: 'Leaves', href: '/admin/leaves', icon: CalendarCheck },
     { title: 'Leave Management', href: '/admin/leave-management', icon: Calendar },
@@ -89,12 +91,16 @@ const hrNavItems: NavItem[] = [
     { title: 'Attendance', href: '/hr/attendance', icon: Clock, module: 'attendance' },
     { title: 'My Attendance', href: '/hr/my-attendance', icon: Clock, module: 'attendance' },
     { title: 'Edit Requests', href: '/hr/attendance-requests', icon: FileEdit, module: 'attendance' },
+    { title: 'My Edit Requests', href: '/hr/my-edit-requests', icon: FileEdit, module: 'attendance' },
   ]},
   { title: 'Leaves', href: '/hr/leaves', icon: CalendarCheck, module: 'leaves', children: [
     { title: 'Employee Leaves', href: '/hr/employee-leaves', icon: Users, module: 'leaves' },
     { title: 'My Leaves', href: '/hr/leaves', icon: CalendarCheck, module: 'leaves' },
   ]},
-  { title: 'Tasks', href: '/hr/tasks', icon: ClipboardList, module: 'tasks' },
+  { title: 'Tasks', href: '/hr/tasks', icon: ClipboardList, module: 'tasks', children: [
+    { title: 'Employee Tasks', href: '/hr/tasks', icon: ClipboardList, module: 'tasks' },
+    { title: 'My Tasks', href: '/hr/my-tasks', icon: ClipboardList, module: 'tasks' },
+  ]},
   { title: 'Expenses', href: '/hr/expenses', icon: Receipt, module: 'expenses' },
   { title: 'Chat', href: '/hr/chat', icon: MessageSquare, module: 'chat' },
   { title: 'Announcements', href: '/hr/announcements', icon: Megaphone, module: 'announcements' },
@@ -112,7 +118,10 @@ const hrNavItems: NavItem[] = [
 const employeeNavItems: NavItem[] = [
   { title: 'Dashboard', href: '/employee', icon: LayoutDashboard, module: 'dashboard' },
   { title: 'My Profile', href: '/employee/profile', icon: UserCircle },
-  { title: 'Attendance', href: '/employee/attendance', icon: Clock, module: 'attendance' },
+  { title: 'Attendance', href: '/employee/attendance', icon: Clock, module: 'attendance', children: [
+    { title: 'Attendance', href: '/employee/attendance', icon: Clock, module: 'attendance' },
+    { title: 'My Edit Requests', href: '/employee/my-edit-requests', icon: FileEdit, module: 'attendance' },
+  ]},
   { title: 'Tasks', href: '/employee/tasks', icon: ClipboardList, module: 'tasks' },
   { title: 'Expenses', href: '/employee/expenses', icon: Receipt, module: 'expenses' },
   { title: 'Chat', href: '/employee/chat', icon: MessageSquare, module: 'chat' },

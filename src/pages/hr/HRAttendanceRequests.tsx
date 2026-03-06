@@ -17,9 +17,17 @@ import {
   FileEdit,
   User,
   RefreshCw,
+  ShieldCheck,
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
 import { attendanceAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface EditRequest {
   _id: string;
@@ -45,20 +53,24 @@ interface EditRequest {
   reviewedBy?: {
     _id: string;
     name: string;
+    role?: string;
   };
   reviewNote?: string;
+  reviewedAt?: string;
   createdAt: string;
 }
 
 const HRAttendanceRequests = () => {
   const { toast } = useToast();
+  const { userRole } = useAuth();
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<EditRequest[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<EditRequest | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [reviewNote, setReviewNote] = useState('');
   const [processing, setProcessing] = useState(false);
-  const [filter, setFilter] = useState<'pending' | 'all'>('pending');
+  const [filter, setFilter] = useState<'pending' | 'all' | 'approved' | 'rejected'>('all');
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   useEffect(() => {
     fetchRequests();
@@ -151,9 +163,7 @@ const HRAttendanceRequests = () => {
     }
   };
 
-  const filteredRequests = filter === 'pending' 
-    ? requests.filter(r => r.status === 'pending')
-    : requests;
+  const filteredRequests = filter === 'all' ? requests : requests.filter(r => r.status === filter);
 
   const pendingCount = requests.filter(r => r.status === 'pending').length;
 
@@ -168,23 +178,29 @@ const HRAttendanceRequests = () => {
               Attendance Edit Requests
             </h1>
             <p className="text-muted-foreground mt-1">
-              Review and manage employee attendance correction requests
+              {userRole === 'admin'
+                ? 'Review and manage all employee & HR attendance correction requests'
+                : 'Review and manage employee attendance correction requests'}
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <Button
-              variant={filter === 'pending' ? 'default' : 'outline'}
-              onClick={() => setFilter('pending')}
-            >
-              <AlertCircle className="h-4 w-4 mr-2" />
-              Pending ({pendingCount})
-            </Button>
-            <Button
-              variant={filter === 'all' ? 'default' : 'outline'}
-              onClick={() => setFilter('all')}
-            >
-              All Requests
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  {filter === 'all' && 'All Requests'}
+                  {filter === 'pending' && `Pending (${pendingCount})`}
+                  {filter === 'approved' && `Approved (${requests.filter(r => r.status === 'approved').length})`}
+                  {filter === 'rejected' && `Rejected (${requests.filter(r => r.status === 'rejected').length})`}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-card border-border">
+                <DropdownMenuItem onSelect={() => setFilter('all')}>All Requests</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setFilter('pending')}>Pending ({pendingCount})</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setFilter('approved')}>Approved ({requests.filter(r => r.status === 'approved').length})</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setFilter('rejected')}>Rejected ({requests.filter(r => r.status === 'rejected').length})</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <Button variant="outline" onClick={fetchRequests} disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Refresh
@@ -243,7 +259,10 @@ const HRAttendanceRequests = () => {
         <Card className="glass-card">
           <CardHeader>
             <CardTitle>
-              {filter === 'pending' ? 'Pending Requests' : 'All Requests'}
+              {filter === 'pending' && `Pending Requests (${pendingCount})`}
+              {filter === 'approved' && `Approved Requests (${requests.filter(r => r.status === 'approved').length})`}
+              {filter === 'rejected' && `Rejected Requests (${requests.filter(r => r.status === 'rejected').length})`}
+              {filter === 'all' && `All Requests (${requests.length})`}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -255,25 +274,39 @@ const HRAttendanceRequests = () => {
             ) : filteredRequests.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <CheckCircle className="h-12 w-12 text-success mb-4" />
-                <p className="text-xl font-semibold text-foreground">No pending requests</p>
-                <p className="text-muted-foreground">All attendance edit requests have been processed</p>
+                <p className="text-xl font-semibold text-foreground">
+                  {filter === 'pending' ? 'No pending requests' : `No ${filter === 'all' ? '' : filter + ' '}requests found`}
+                </p>
+                <p className="text-muted-foreground">
+                  {filter === 'pending'
+                    ? 'All attendance edit requests have been processed'
+                    : 'Try selecting a different filter above'}
+                </p>
               </div>
             ) : (
               <div className="space-y-4">
                 {filteredRequests.map((request) => (
                   <div
                     key={request._id}
-                    className="bg-secondary/30 rounded-lg p-4 border border-border hover:border-primary/40 transition-colors"
+                    className={`bg-secondary/30 rounded-lg p-4 border transition-colors hover:border-primary/40 ${
+                      request.status === 'approved'
+                        ? 'border-success/40'
+                        : request.status === 'rejected'
+                        ? 'border-destructive/40'
+                        : 'border-warning/40'
+                    }`}
                   >
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       {/* Employee Info */}
                       <div className="flex items-center gap-3">
-                        <Avatar className="h-12 w-12">
-                          <AvatarImage src={request.employee?.profilePhoto} />
-                          <AvatarFallback className="bg-primary/20 text-primary">
-                            {request.employee?.name?.charAt(0) || 'E'}
-                          </AvatarFallback>
-                        </Avatar>
+                            <button onClick={() => setPreviewImage(request.employee?.profilePhoto || null)} className="group">
+                              <Avatar className="h-12 w-12">
+                                <AvatarImage src={request.employee?.profilePhoto} />
+                                <AvatarFallback className="bg-primary/20 text-primary">
+                                  {request.employee?.name?.charAt(0) || 'E'}
+                                </AvatarFallback>
+                              </Avatar>
+                            </button>
                         <div>
                           <p className="font-semibold text-foreground">
                             {request.employee?.name || 'Unknown Employee'}
@@ -359,11 +392,31 @@ const HRAttendanceRequests = () => {
 
                     {/* Review info for processed requests */}
                     {request.status !== 'pending' && request.reviewedBy && (
-                      <div className="mt-3 text-sm text-muted-foreground">
-                        <span>Reviewed by </span>
+                      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                        <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                        <span>{request.status === 'approved' ? 'Approved' : 'Rejected'} by</span>
                         <span className="text-foreground font-medium">{request.reviewedBy.name}</span>
+                        {request.reviewedBy.role && (
+                          <Badge
+                            variant="outline"
+                            className={`text-xs px-1.5 py-0 ${
+                              request.reviewedBy.role === 'admin'
+                                ? 'border-primary/50 text-primary'
+                                : 'border-blue-500/50 text-blue-500'
+                            }`}
+                          >
+                            {request.reviewedBy.role === 'admin' ? 'Admin' : 'HR'}
+                          </Badge>
+                        )}
+                        {request.reviewedAt && (
+                          <span className="text-xs text-muted-foreground/70">
+                            on {new Date(request.reviewedAt).toLocaleDateString()}
+                          </span>
+                        )}
                         {request.reviewNote && (
-                          <span> • Note: {request.reviewNote}</span>
+                          <span className="w-full mt-1 text-xs text-muted-foreground">
+                            <strong>Note:</strong> {request.reviewNote}
+                          </span>
                         )}
                       </div>
                     )}
@@ -407,6 +460,20 @@ const HRAttendanceRequests = () => {
                 {processing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Confirm Rejection
               </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Image preview dialog */}
+        <Dialog open={!!previewImage} onOpenChange={(open) => { if (!open) setPreviewImage(null); }}>
+          <DialogContent className="glass-card max-w-lg">
+            <div className="flex justify-center">
+              {previewImage ? (
+                // eslint-disable-next-line jsx-a11y/img-redundant-alt
+                <img src={previewImage} alt="Employee image" className="max-h-[60vh] object-contain rounded" />
+              ) : (
+                <div className="p-6">No image</div>
+              )}
             </div>
           </DialogContent>
         </Dialog>

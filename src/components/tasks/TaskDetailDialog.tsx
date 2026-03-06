@@ -99,6 +99,13 @@ const TaskDetailDialog = ({
     title: '', description: '', assignedTo: '', startDate: '', dueDate: '', priority: 'medium',
   });
 
+  // Progress editing state (manual update when no subtasks)
+  const [localProgress, setLocalProgress] = useState<number>(task?.progress ?? 0);
+  const [progressUpdating, setProgressUpdating] = useState(false);
+
+  // Keep localProgress in sync when task prop changes
+  useEffect(() => { setLocalProgress(task?.progress ?? 0); }, [task?._id, task?.progress]);
+
   // User-defined workflow state
   const [workflowManagerOpen, setWorkflowManagerOpen] = useState(false);
   const [stepComment, setStepComment]     = useState('');
@@ -137,6 +144,19 @@ const TaskDetailDialog = ({
   const subtaskProgress = childTasks.length > 0
     ? Math.round(childTasks.reduce((sum: number, c: any) => sum + (c.progress || 0), 0) / childTasks.length)
     : task.progress;
+
+  const handleUpdateProgress = async (value: number) => {
+    setProgressUpdating(true);
+    try {
+      await taskAPI.updateProgress(task._id, value);
+      toast({ title: 'Progress updated', description: `Task progress set to ${value}%` });
+      onTaskUpdated();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.response?.data?.message || 'Failed to update progress', variant: 'destructive' });
+    } finally {
+      setProgressUpdating(false);
+    }
+  };
 
   const handleTransition = async (action: string) => {
     setTransitioning(true);
@@ -517,13 +537,51 @@ ${entries.map((e: any, i: number) => `
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-xs text-muted-foreground font-medium">Overall Progress</Label>
-                <span className={`text-sm font-bold ${subtaskProgress === 100 ? 'text-green-500' : 'text-primary'}`}>{subtaskProgress}%</span>
+                <span className={`text-sm font-bold ${subtaskProgress === 100 ? 'text-green-500' : 'text-primary'}`}>
+                  {childTasks.length > 0 ? subtaskProgress : localProgress}%
+                </span>
               </div>
-              <Progress value={subtaskProgress} className="h-3 rounded-full" />
-              {childTasks.length > 0 && (
+              <Progress value={childTasks.length > 0 ? subtaskProgress : localProgress} className="h-3 rounded-full" />
+              {childTasks.length > 0 ? (
                 <p className="text-[10px] text-muted-foreground">
                   Auto-calculated from {childTasks.filter((c: any) => c.status === 'completed').length}/{childTasks.length} completed subtasks
                 </p>
+              ) : (
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={localProgress}
+                      onChange={(e) => setLocalProgress(Number(e.target.value))}
+                      className="flex-1 h-2 accent-primary cursor-pointer"
+                    />
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={localProgress}
+                        onChange={(e) => {
+                          const v = Math.min(100, Math.max(0, Number(e.target.value)));
+                          setLocalProgress(v);
+                        }}
+                        className="w-14 h-6 text-xs text-center rounded border border-border bg-secondary text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                      <Button
+                        size="sm"
+                        className="h-6 px-2 text-xs glow-button"
+                        disabled={progressUpdating || localProgress === (task.progress ?? 0)}
+                        onClick={() => handleUpdateProgress(localProgress)}
+                      >
+                        {progressUpdating ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">Drag the slider or type a value (0–100%) and click Save</p>
+                </div>
               )}
             </div>
 

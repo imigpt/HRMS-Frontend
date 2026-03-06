@@ -36,7 +36,7 @@ import {
   Loader2,
   Upload,
 } from 'lucide-react';
-import { hrAPI, adminAPI } from '@/lib/apiClient';
+import { hrAPI, adminAPI, attendanceAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -87,65 +87,31 @@ interface AttendanceEditRequest {
   requestedAt: string;
 }
 
-// Generate full month attendance data (temporary mock until attendance API is integrated)
-const generateAttendanceData = (year: number, month: number, employeeId: string): DailyAttendance[] => {
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const attendance: DailyAttendance[] = [];
-  
-  for (let day = 1; day <= daysInMonth; day++) {
-    const date = new Date(year, month, day);
-    const dateStr = date.toISOString().split('T')[0];
-    
-    // Generate realistic attendance data
-    const rand = Math.random();
-    const dayOfWeek = date.getDay();
-    
-    // Skip weekends
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-      continue;
-    }
-    
-    if (rand > 0.9) {
-      attendance.push({
-        date: dateStr,
-        status: 'absent',
-        punchIn: null,
-        punchOut: null,
-        duration: null,
-        remarks: null,
-      });
-    } else if (rand > 0.8) {
-      attendance.push({
-        date: dateStr,
-        status: 'leave',
-        punchIn: null,
-        punchOut: null,
-        duration: null,
-        remarks: 'Sick Leave',
-      });
-    } else if (rand > 0.7) {
-      attendance.push({
-        date: dateStr,
-        status: 'late',
-        punchIn: '10:15 AM',
-        punchOut: '06:30 PM',
-        duration: '08:15',
-        remarks: 'Traffic delay',
-      });
-    } else {
-      attendance.push({
-        date: dateStr,
-        status: 'present',
-        punchIn: '09:00 AM',
-        punchOut: '06:00 PM',
-        duration: '09:00',
-        remarks: null,
-      });
-    }
-  }
-  
-  return attendance;
+// Helper: format a Date to "09:00 AM"
+const fmtTime = (d: Date | string | null | undefined): string | null => {
+  if (!d) return null;
+  const dt = typeof d === 'string' ? new Date(d) : d;
+  if (isNaN(dt.getTime())) return null;
+  return dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 };
+
+// Helper: format workHours number (e.g. 9.5) to "09:30"
+const fmtDuration = (h: number | null | undefined): string | null => {
+  if (h == null || isNaN(h)) return null;
+  const hrs = Math.floor(h);
+  const mins = Math.round((h - hrs) * 60);
+  return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+};
+
+// Map raw API attendance record → DailyAttendance shape
+const mapRecord = (r: any): DailyAttendance => ({
+  date: new Date(r.date).toISOString().split('T')[0],
+  status: r.status || 'present',
+  punchIn: fmtTime(r.checkIn?.time),
+  punchOut: fmtTime(r.checkOut?.time),
+  duration: fmtDuration(r.workHours),
+  remarks: r.notes || null,
+});
 
 type Section = 'overview' | 'attendance' | 'tasks' | 'chat';
 
@@ -162,9 +128,11 @@ const EmployeeDetail = () => {
   const [editRequests, setEditRequests] = useState<AttendanceEditRequest[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<AttendanceEditRequest | null>(null);
   const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   
-  // Attendance filter states
-  const [attendanceView, setAttendanceView] = useState<'weekly' | 'monthly'>('monthly');
+  // Attendance state (real data)
+  const [allAttendance, setAllAttendance] = useState<DailyAttendance[]>([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
   const [isDownloadDialogOpen, setIsDownloadDialogOpen] = useState(false);
@@ -173,8 +141,53 @@ const EmployeeDetail = () => {
     endDate: '',
   });
   
-  // Edit dialog states
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  // ── Fetch real attendance data when section/month/year changes ─────────────
+  useEffect(() => {
+    if (!employeeId || activeSection !== 'attendance') return;
+    const fetchAttendance = async () => {
+      setAttendanceLoading(true);
+      try {
+        const startDate = new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0];
+        const endDate = new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0];
+        const res = await attendanceAPI.getEmployeeAttendance(employeeId, { startDate, endDate });
+        const records: any[] = res?.data?.data || [];
+
+        // Build a map of existing records keyed by YYYY-MM-DD
+        const recordMap = new Map<string, DailyAttendance>();
+        records.forEach(r => {
+          const key = new Date(r.date).toISOString().split('T')[0];
+          recordMap.set(key, mapRecord(r));
+        });
+
+        // Fill the full month: weekdays only; future days without a record are skipped
+        const today = new Date();
+        today.setHours(23, 59, 59, 999);
+        const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+        const full: DailyAttendance[] = [];
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dt = new Date(selectedYear, selectedMonth, d);
+          const dow = dt.getDay();
+          if (dow === 0 || dow === 6) continue; // skip weekends
+          const key = dt.toISOString().split('T')[0];
+          if (recordMap.has(key)) {
+            full.push(recordMap.get(key)!);
+          } else if (dt <= today) {
+            // Past weekday with no check-in → absent
+            full.push({ date: key, status: 'absent', punchIn: null, punchOut: null, duration: null, remarks: null });
+          }
+        }
+        setAllAttendance(full);
+      } catch {
+        setAllAttendance([]);
+      } finally {
+        setAttendanceLoading(false);
+      }
+    };
+    fetchAttendance();
+  }, [employeeId, selectedMonth, selectedYear, activeSection]);
+
+  // Attendance filter states
+  const [attendanceView, setAttendanceView] = useState<'weekly' | 'monthly'>('monthly');
   const [editLoading, setEditLoading] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>('');
@@ -304,19 +317,14 @@ const EmployeeDetail = () => {
     }
   };
   
-  // Get employee attendance for selected month (keeping mock for now as attendance API might be different)
-  const allAttendance = employee ? generateAttendanceData(selectedYear, selectedMonth, employeeId || '') : [];
-  
   // Filter attendance based on view
   const getFilteredAttendance = () => {
     if (attendanceView === 'weekly') {
-      // Get last 7 days from today
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 7);
-      return allAttendance.filter(record => {
-        const recordDate = new Date(record.date);
-        return recordDate >= weekAgo && recordDate <= today;
-      });
+      const todayStr = new Date().toISOString().split('T')[0];
+      const weekAgoStr = weekAgo.toISOString().split('T')[0];
+      return allAttendance.filter(record => record.date >= weekAgoStr && record.date <= todayStr);
     }
     return allAttendance; // Monthly view shows all
   };
@@ -352,21 +360,18 @@ const EmployeeDetail = () => {
   };
   
   const handleDownloadReport = () => {
-    // Generate CSV or trigger download
-    const csvContent = generateAttendanceCSV();
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const excelContent = generateAttendanceExcel();
+    const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${employee?.name}_Attendance_${downloadDateRange.startDate}_to_${downloadDateRange.endDate}.csv`;
+    link.download = `${employee?.name}_Attendance_${downloadDateRange.startDate || months[selectedMonth] + '_' + selectedYear}.xls`;
     link.click();
     window.URL.revokeObjectURL(url);
     setIsDownloadDialogOpen(false);
   };
   
-  const generateAttendanceCSV = () => {
-    let csv = 'Date,Status,Punch In,Punch Out,Duration,Remarks\n';
-    
+  const generateAttendanceExcel = () => {
     const filteredData = downloadDateRange.startDate && downloadDateRange.endDate
       ? allAttendance.filter(record => {
           const recordDate = new Date(record.date);
@@ -375,12 +380,28 @@ const EmployeeDetail = () => {
           return recordDate >= start && recordDate <= end;
         })
       : allAttendance;
-    
-    filteredData.forEach(record => {
-      csv += `${record.date},${record.status},${record.punchIn || '-'},${record.punchOut || '-'},${record.duration || '-'},${record.remarks || '-'}\n`;
-    });
-    
-    return csv;
+
+    const rows = filteredData.map(r => {
+      const dt = new Date(r.date);
+      return `<tr>
+        <td>${dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+        <td>${dt.toLocaleDateString('en-US', { weekday: 'long' })}</td>
+        <td>${r.status}</td>
+        <td>${r.punchIn || '-'}</td>
+        <td>${r.punchOut || '-'}</td>
+        <td>${r.duration || '-'}</td>
+        <td>${r.remarks || '-'}</td>
+      </tr>`;
+    }).join('');
+
+    return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Attendance</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>
+<body><table border="1" style="border-collapse:collapse;font-family:Arial;font-size:12px">
+  <thead><tr style="background:#4f46e5;color:#fff;font-weight:bold">
+    <th>Date</th><th>Day</th><th>Status</th><th>Punch In</th><th>Punch Out</th><th>Duration</th><th>Remarks</th>
+  </tr></thead>
+  <tbody>${rows}</tbody>
+</table></body></html>`;
   };
 
   const handleApproveRequest = (requestId: string) => {
@@ -815,15 +836,15 @@ const EmployeeDetail = () => {
                   <CardHeader>
                     <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                       <div className="flex items-center gap-3">
-                        <div className="p-3 rounded-lg bg-primary/10">
-                          <Clock className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
+                        {/* <div className="p-3 rounded-lg bg-primary/10"> */}
+                          {/* <Clock className="h-5 w-5 text-primary" /> */}
+                        {/* </div> */}
+                        {/* <div>
                           <CardTitle className="text-xl">Attendance Records</CardTitle>
                           <p className="text-sm text-muted-foreground mt-1">
                             View and download employee attendance history
                           </p>
-                        </div>
+                        </div> */}
                       </div>
                       <div className="flex flex-wrap items-center gap-3">
                         {/* View Toggle */}
@@ -887,162 +908,154 @@ const EmployeeDetail = () => {
                             <Button variant="outline" size="sm" onClick={handleNextMonth}>
                               <ChevronRight className="h-4 w-4" />
                             </Button>
+
+                            {/* Download Report Button placed next to year selector */}
+                            <Dialog open={isDownloadDialogOpen} onOpenChange={setIsDownloadDialogOpen}>
+                              <DialogTrigger asChild>
+                                <Button className="glow-button h-8 ml-2">
+                                  <Download className="h-3 w-3 mr-1" />
+                                  Download Report
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="glass-card max-w-md">
+                                <DialogHeader>
+                                  <DialogTitle>Download Attendance Report</DialogTitle>
+                                  <DialogDescription>
+                                    Select date range to export {employee?.name}'s attendance records
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                  <div className="space-y-2">
+                                    <Label htmlFor="startDate">Start Date</Label>
+                                    <Input
+                                      id="startDate"
+                                      type="date"
+                                      className="bg-secondary border-border"
+                                      value={downloadDateRange.startDate}
+                                      onChange={(e) => setDownloadDateRange({ ...downloadDateRange, startDate: e.target.value })}
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor="endDate">End Date</Label>
+                                    <Input
+                                      id="endDate"
+                                      type="date"
+                                      className="bg-secondary border-border"
+                                      value={downloadDateRange.endDate}
+                                      onChange={(e) => setDownloadDateRange({ ...downloadDateRange, endDate: e.target.value })}
+                                    />
+                                  </div>
+                                  <div className="bg-muted/30 p-3 rounded-lg">
+                                    <p className="text-xs text-muted-foreground">
+                                      <strong>Note:</strong> Leave dates empty to download all records from the selected month
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex justify-end gap-3">
+                                  <Button variant="outline" onClick={() => setIsDownloadDialogOpen(false)}>
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    className="glow-button"
+                                    onClick={handleDownloadReport}
+                                  >
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Download Excel
+                                  </Button>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
                           </div>
                         )}
-                        
-                        {/* Download Report Button */}
-                        <Dialog open={isDownloadDialogOpen} onOpenChange={setIsDownloadDialogOpen}>
-                          <DialogTrigger asChild>
-                            <Button className="glow-button h-8">
-                              <Download className="h-3 w-3 mr-1" />
-                              Download Report
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="glass-card max-w-md">
-                            <DialogHeader>
-                              <DialogTitle>Download Attendance Report</DialogTitle>
-                              <DialogDescription>
-                                Select date range to export {employee?.name}'s attendance records
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                              <div className="space-y-2">
-                                <Label htmlFor="startDate">Start Date</Label>
-                                <Input
-                                  id="startDate"
-                                  type="date"
-                                  className="bg-secondary border-border"
-                                  value={downloadDateRange.startDate}
-                                  onChange={(e) => setDownloadDateRange({ ...downloadDateRange, startDate: e.target.value })}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="endDate">End Date</Label>
-                                <Input
-                                  id="endDate"
-                                  type="date"
-                                  className="bg-secondary border-border"
-                                  value={downloadDateRange.endDate}
-                                  onChange={(e) => setDownloadDateRange({ ...downloadDateRange, endDate: e.target.value })}
-                                />
-                              </div>
-                              <div className="bg-muted/30 p-3 rounded-lg">
-                                <p className="text-xs text-muted-foreground">
-                                  <strong>Note:</strong> Leave dates empty to download all records from the selected month
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex justify-end gap-3">
-                              <Button variant="outline" onClick={() => setIsDownloadDialogOpen(false)}>
-                                Cancel
-                              </Button>
-                              <Button
-                                className="glow-button"
-                                onClick={handleDownloadReport}
-                              >
-                                <Download className="h-4 w-4 mr-2" />
-                                Download CSV
-                              </Button>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="mb-4 flex items-center justify-between">
-                      <div className="text-sm text-muted-foreground">
-                        Showing <span className="font-semibold text-foreground">{employeeAttendance.length}</span> records
-                        {attendanceView === 'weekly' && ' (Last 7 days)'}
-                        {attendanceView === 'monthly' && ` (${months[selectedMonth]} ${selectedYear})`}
-                      </div>
-                      {employeeAttendance.length > 0 && (
-                        <div className="flex items-center gap-4 text-xs">
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full bg-success"></div>
-                            <span className="text-muted-foreground">Present: {employeeAttendance.filter(r => r.status === 'present').length}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full bg-warning"></div>
-                            <span className="text-muted-foreground">Late: {employeeAttendance.filter(r => r.status === 'late').length}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full bg-destructive"></div>
-                            <span className="text-muted-foreground">Absent: {employeeAttendance.filter(r => r.status === 'absent').length}</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    {employeeAttendance.length > 0 ? (
-                      <div className="rounded-lg border border-border overflow-hidden">
-                        <div className="overflow-x-auto">
-                          <table className="w-full">
-                            <thead>
-                              <tr className="bg-secondary/50 border-b border-border">
-                                <th className="text-left p-4 text-sm font-semibold text-foreground">Date</th>
-                                <th className="text-left p-4 text-sm font-semibold text-foreground">Day</th>
-                                <th className="text-left p-4 text-sm font-semibold text-foreground">Status</th>
-                                <th className="text-left p-4 text-sm font-semibold text-foreground">Punch In</th>
-                                <th className="text-left p-4 text-sm font-semibold text-foreground">Punch Out</th>
-                                <th className="text-left p-4 text-sm font-semibold text-foreground">Duration</th>
-                                <th className="text-left p-4 text-sm font-semibold text-foreground">Remarks</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {[...employeeAttendance].reverse().map((record) => {
-                                const recordDate = new Date(record.date);
-                                const dayName = recordDate.toLocaleDateString('en-US', { weekday: 'short' });
-                                
-                                return (
-                                  <tr key={record.date} className="border-b border-border hover:bg-secondary/30 transition-colors">
-                                    <td className="p-4 text-sm text-muted-foreground">
-                                      {recordDate.toLocaleDateString('en-US', {
-                                        month: 'short',
-                                        day: 'numeric',
-                                        year: 'numeric'
-                                      })}
-                                    </td>
-                                    <td className="p-4 text-sm text-muted-foreground font-medium">
-                                      {dayName}
-                                    </td>
-                                    <td className="p-4">
-                                      <Badge className={
-                                        record.status === 'present' ? 'status-approved' :
-                                        record.status === 'late' ? 'status-pending' :
-                                        record.status === 'absent' ? 'status-rejected' :
-                                        'status-in-progress'
-                                      }>
-                                        {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
-                                      </Badge>
-                                    </td>
-                                    <td className="p-4 text-sm">
-                                      <span className="text-foreground font-medium">{record.punchIn || '-'}</span>
-                                    </td>
-                                    <td className="p-4 text-sm">
-                                      <span className="text-foreground font-medium">{record.punchOut || '-'}</span>
-                                    </td>
-                                    <td className="p-4 text-sm text-foreground font-medium">
-                                      {record.duration || '-'}
-                                    </td>
-                                    <td className="p-4 text-sm text-muted-foreground">
-                                      {record.remarks || '-'}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
+                    {attendanceLoading ? (
+                      <div className="flex items-center justify-center py-12 gap-3 text-muted-foreground">
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                        <span>Loading attendance records…</span>
                       </div>
                     ) : (
-                      <div className="p-12 text-center">
-                        <Clock className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                        <h3 className="text-xl font-semibold mb-2">No Attendance Records</h3>
-                        <p className="text-muted-foreground">
-                          No attendance records found for the selected period.
-                        </p>
-                      </div>
-                    )}
+                      <>
+                        <div className="mb-4 flex items-center justify-between">
+                          <div className="text-sm text-muted-foreground">
+                            Showing <span className="font-semibold text-foreground">{employeeAttendance.length}</span> records
+                            {attendanceView === 'weekly' && ' (Last 7 days)'}
+                            {attendanceView === 'monthly' && ` (${months[selectedMonth]} ${selectedYear})`}
+                          </div>
+                          {employeeAttendance.length > 0 && (
+                            <div className="flex items-center gap-4 text-xs">
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-success"></div>
+                                <span className="text-muted-foreground">Present: {employeeAttendance.filter(r => r.status === 'present').length}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-warning"></div>
+                                <span className="text-muted-foreground">Late: {employeeAttendance.filter(r => r.status === 'late').length}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-destructive"></div>
+                                <span className="text-muted-foreground">Absent: {employeeAttendance.filter(r => r.status === 'absent').length}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        {employeeAttendance.length > 0 ? (
+                          <div className="rounded-lg border border-border overflow-hidden">
+                            <div className="overflow-x-auto">
+                              <table className="w-full">
+                                <thead>
+                                  <tr className="bg-secondary/50 border-b border-border">
+                                    <th className="text-left p-4 text-sm font-semibold text-foreground">Date</th>
+                                    <th className="text-left p-4 text-sm font-semibold text-foreground">Day</th>
+                                    <th className="text-left p-4 text-sm font-semibold text-foreground">Status</th>
+                                    <th className="text-left p-4 text-sm font-semibold text-foreground">Punch In</th>
+                                    <th className="text-left p-4 text-sm font-semibold text-foreground">Punch Out</th>
+                                    <th className="text-left p-4 text-sm font-semibold text-foreground">Duration</th>
+                                    <th className="text-left p-4 text-sm font-semibold text-foreground">Remarks</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {[...employeeAttendance].reverse().map((record) => {
+                                    const recordDate = new Date(record.date);
+                                    const dayName = recordDate.toLocaleDateString('en-US', { weekday: 'short' });
+                                    return (
+                                      <tr key={record.date} className="border-b border-border hover:bg-secondary/30 transition-colors">
+                                        <td className="p-4 text-sm text-muted-foreground">
+                                          {recordDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                        </td>
+                                        <td className="p-4 text-sm text-muted-foreground font-medium">{dayName}</td>
+                                        <td className="p-4">
+                                          <Badge className={
+                                            record.status === 'present' ? 'status-approved' :
+                                            record.status === 'late' ? 'status-pending' :
+                                            record.status === 'absent' ? 'status-rejected' :
+                                            'status-in-progress'
+                                          }>
+                                            {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
+                                          </Badge>
+                                        </td>
+                                        <td className="p-4 text-sm"><span className="text-foreground font-medium">{record.punchIn || '-'}</span></td>
+                                        <td className="p-4 text-sm"><span className="text-foreground font-medium">{record.punchOut || '-'}</span></td>
+                                        <td className="p-4 text-sm text-foreground font-medium">{record.duration || '-'}</td>
+                                        <td className="p-4 text-sm text-muted-foreground">{record.remarks || '-'}</td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-12 text-center">
+                            <Clock className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                            <h3 className="text-xl font-semibold mb-2">No Attendance Records</h3>
+                            <p className="text-muted-foreground">No attendance records found for the selected period.</p>
+                          </div>
+                        )}
+                      </>
+                    )} {/* end attendanceLoading */}
                   </CardContent>
                 </Card>
               </>

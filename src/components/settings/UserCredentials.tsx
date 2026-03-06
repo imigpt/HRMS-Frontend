@@ -72,11 +72,25 @@ const UserCredentials = () => {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const handleOpenResetDialog = (user: UserCredential) => {
+  const handleOpenResetDialog = async (user: UserCredential) => {
     setSelectedUser(user);
     setNewPassword('');
     setShowPassword(false);
     setResetDialogOpen(true);
+    // Auto-generate a password for users who don't have admin-set credentials yet
+    if (!user.lastSetPassword) {
+      setIsGenerating(true);
+      try {
+        const res = await authAPI.generatePassword();
+        const data = res.data as any;
+        setNewPassword(data.password);
+        setShowPassword(true);
+      } catch {
+        // ignore — user can still click "Generate" manually
+      } finally {
+        setIsGenerating(false);
+      }
+    }
   };
 
   const handleGeneratePassword = async () => {
@@ -144,7 +158,7 @@ const UserCredentials = () => {
           <Users className="h-5 w-5 text-primary" />
           User Credentials
         </CardTitle>
-        <CardDescription>View user accounts and manage passwords. Passwords are shown only after being set/reset by admin.</CardDescription>
+        <CardDescription>View user accounts and manage passwords. Click the key icon to set or reset a password — the plain-text credential will be shown immediately.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Filters */}
@@ -255,12 +269,12 @@ const UserCredentials = () => {
                     <TableCell className="text-right">
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant={user.lastSetPassword ? 'outline' : 'default'}
                         className="gap-1.5"
                         onClick={() => handleOpenResetDialog(user)}
                       >
                         <KeyRound className="h-3.5 w-3.5" />
-                        Reset Password
+                        {user.lastSetPassword ? 'Reset Password' : 'Set Credential'}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -294,7 +308,9 @@ const UserCredentials = () => {
           <DialogHeader>
             <DialogTitle>Reset Password</DialogTitle>
             <DialogDescription>
-              Set a new password for <strong>{selectedUser?.name}</strong> ({selectedUser?.email})
+              {selectedUser?.lastSetPassword
+                ? <>Reset password for <strong>{selectedUser?.name}</strong> ({selectedUser?.email})</>  
+                : <>Set a credential for <strong>{selectedUser?.name}</strong> ({selectedUser?.email}). A strong password has been auto-generated — copy it and share with the user.</>}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -340,9 +356,9 @@ const UserCredentials = () => {
               {isResetting ? (
                 <span className="flex items-center gap-2">
                   <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                  Resetting...
+                  {selectedUser?.lastSetPassword ? 'Resetting...' : 'Setting...'}
                 </span>
-              ) : 'Reset Password'}
+              ) : (selectedUser?.lastSetPassword ? 'Reset Password' : 'Set Credential')}
             </Button>
           </DialogFooter>
         </DialogContent>

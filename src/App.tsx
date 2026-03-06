@@ -21,12 +21,14 @@ import HRDetail from "./pages/admin/HRDetail";import AdminClients from './pages/
 import HREmployees from "./pages/hr/HREmployees";
 import HRProfile from "./pages/hr/HRProfile";
 import HRTasks from "./pages/hr/HRTasks";
+import HRMyTasks from "./pages/hr/HRMyTasks";
 import HRAttendanceRequests from "./pages/hr/HRAttendanceRequests";
 import HRAttendance from "./pages/hr/HRAttendance";import HRClients from './pages/hr/HRClients';import EmployeeDetail from "./pages/hr/EmployeeDetail";
 import HREmployeeLeaves from "./pages/hr/HREmployeeLeaves";
 import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
 import EmployeeProfile from "./pages/employee/EmployeeProfile";
 import EmployeeAttendance from "./pages/employee/EmployeeAttendance";
+import EmployeeMyEditRequests from "./pages/employee/EmployeeMyEditRequests";
 import EmployeeTasks from "./pages/employee/EmployeeTasks";
 import CompanyPolicies from './pages/CompanyPolicies';
 import ClientDashboard from './pages/client/ClientDashboard';
@@ -104,9 +106,11 @@ const App = () => (
             <Route path="/hr/my-attendance" element={<ProtectedRoute allowedRole="hr"><HRAttendance /></ProtectedRoute>} />
             <Route path="/hr/attendance" element={<ProtectedRoute allowedRole="hr"><AttendanceModule role="hr" /></ProtectedRoute>} />
             <Route path="/hr/attendance-requests" element={<ProtectedRoute allowedRole="hr"><HRAttendanceRequests /></ProtectedRoute>} />
+            <Route path="/hr/my-edit-requests" element={<ProtectedRoute allowedRole="hr"><EmployeeMyEditRequests /></ProtectedRoute>} />
             <Route path="/hr/leaves" element={<ProtectedRoute allowedRole="hr"><LeaveModule role="hr" /></ProtectedRoute>} />
             <Route path="/hr/employee-leaves" element={<ProtectedRoute allowedRole="hr"><HREmployeeLeaves /></ProtectedRoute>} />
             <Route path="/hr/tasks" element={<ProtectedRoute allowedRole="hr"><HRTasks /></ProtectedRoute>} />
+            <Route path="/hr/my-tasks" element={<ProtectedRoute allowedRole="hr"><HRMyTasks /></ProtectedRoute>} />
             <Route path="/hr/clients" element={<ProtectedRoute allowedRole="hr"><HRClients /></ProtectedRoute>} />
             <Route path="/hr/expenses" element={<ProtectedRoute allowedRole="hr"><ExpensesModule role="hr" /></ProtectedRoute>} />
             <Route path="/hr/announcements" element={<ProtectedRoute allowedRole="hr"><AnnouncementsModule role="hr" /></ProtectedRoute>} />
@@ -124,6 +128,7 @@ const App = () => (
             <Route path="/employee/profile" element={<ProtectedRoute allowedRole="employee"><EmployeeProfile /></ProtectedRoute>} />
             <Route path="/employee/chat" element={<ProtectedRoute allowedRole="employee"><ChatModule role="employee" /></ProtectedRoute>} />
             <Route path="/employee/attendance" element={<ProtectedRoute allowedRole="employee"><EmployeeAttendance /></ProtectedRoute>} />
+            <Route path="/employee/my-edit-requests" element={<ProtectedRoute allowedRole="employee"><EmployeeMyEditRequests /></ProtectedRoute>} />
             <Route path="/employee/calendar" element={<ProtectedRoute allowedRole="employee"><CalendarModule role="employee" /></ProtectedRoute>} />
             <Route path="/employee/leave" element={<ProtectedRoute allowedRole="employee"><LeaveModule role="employee" /></ProtectedRoute>} />
             <Route path="/employee/tasks" element={<ProtectedRoute allowedRole="employee"><EmployeeTasks /></ProtectedRoute>} />
