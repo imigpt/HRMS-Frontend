@@ -70,7 +70,8 @@ const EmployeeDashboard = () => {
       setMyTasks(Array.isArray(data?.tasks) ? data.tasks : []);
       setAnnouncements(Array.isArray(data?.announcements) ? data.announcements : []);
       setIsPunchedIn(data?.attendance?.isPunchedIn || false);
-      setPunchTime(data?.attendance?.punchTime || null);
+      const rawPunchTime = data?.attendance?.punchTime;
+      setPunchTime(rawPunchTime ? new Date(rawPunchTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : null);
 
       // Working hours from dashboard data
       const wh = data?.attendance?.workingHours || '0h 0m';
@@ -161,7 +162,8 @@ const EmployeeDashboard = () => {
       if (!isPunchedIn) {
         const response = await attendanceAPI.checkIn();
         setIsPunchedIn(true);
-        setPunchTime(response.data.data?.checkIn || new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
+        const ciRaw = response.data.data?.checkIn;
+        setPunchTime(ciRaw ? new Date(ciRaw).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
         toast({
           title: 'Success',
           description: 'Checked in successfully',
