@@ -39,6 +39,8 @@ export const adminAPI = {
   updateHR: (id: string, data: any) => api.put(`/users/${id}`, data),
   getHRDetail: (id: string) => api.get(`/admin/hr/${id}`),
   resetHRPassword: (hrId: string) => api.post(`/admin/hr/${hrId}/reset-password`),
+  updateHRStatus: (id: string, status: 'active' | 'on-leave' | 'inactive') =>
+    api.put(`/users/${id}`, { status }),
   getEmployees: (params?: any) => api.get('/admin/employees', { params }),
   createEmployee: (data: any) => api.post('/auth/register', data),
   updateEmployee: (id: string, data: any) => api.put(`/users/${id}`, data),

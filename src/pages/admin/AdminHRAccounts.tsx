@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { UserCog, Plus, Edit, Trash2, Mail, Phone, Building2, Shield, Eye, Upload } from 'lucide-react';
+import { UserCog, Plus, Edit, Mail, Phone, Building2, Shield, Eye, Upload } from 'lucide-react';
 import { adminAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
 
@@ -30,7 +30,7 @@ interface HRAccount {
   company?: { name: string; _id: string };
   department: string;
   position: string;
-  status: 'active' | 'inactive';
+  status: 'active' | 'on-leave' | 'inactive';
   employeeId: string;
   joinedDate: string;
   avatar?: string;
@@ -211,35 +211,16 @@ const AdminHRAccounts = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this HR account?')) {
-      try {
-        // TODO: Add delete API call when backend endpoint is ready
-        // await adminAPI.deleteHR(id);
-        toast({
-          title: 'Success',
-          description: 'HR account deleted successfully',
-        });
-        fetchHRAccounts();
-      } catch (error: any) {
-        toast({
-          title: 'Error',
-          description: error.response?.data?.message || 'Failed to delete HR account',
-          variant: 'destructive',
-        });
-      }
-    }
-  };
-
-  const toggleStatus = async (id: string) => {
+  const handleStatusChange = async (id: string, newStatus: 'active' | 'on-leave' | 'inactive') => {
     try {
-      // TODO: Add toggle status API call when backend endpoint is ready
-      // await adminAPI.updateHRStatus(id, newStatus);
+      await adminAPI.updateHRStatus(id, newStatus);
+      setHRAccounts((prev) =>
+        prev.map((hr) => (hr._id === id ? { ...hr, status: newStatus } : hr))
+      );
       toast({
-        title: 'Success',
-        description: 'HR status updated successfully',
+        title: 'Status Updated',
+        description: `HR status changed to "${newStatus}".`,
       });
-      fetchHRAccounts();
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -665,10 +646,15 @@ const AdminHRAccounts = () => {
                       </TableCell>
                       <TableCell>
                         <Badge
-                          className={hr.status === 'active' ? 'status-approved' : 'bg-muted cursor-pointer'}
-                          onClick={() => toggleStatus(hr._id)}
+                          className={
+                            hr.status === 'active'
+                              ? 'status-approved'
+                              : hr.status === 'on-leave'
+                              ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                              : 'bg-muted text-muted-foreground'
+                          }
                         >
-                          {hr.status.charAt(0).toUpperCase() + hr.status.slice(1)}
+                          {hr.status === 'on-leave' ? 'On Leave' : hr.status.charAt(0).toUpperCase() + hr.status.slice(1)}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -676,19 +662,26 @@ const AdminHRAccounts = () => {
                           <Button variant="ghost" size="sm" onClick={() => navigate(`/admin/hr-accounts/${hr._id}`)}>
                             <Eye className="h-4 w-4" />
                           </Button>
-                        <Button variant="ghost" size="sm" onClick={() => openEditDialog(hr)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => handleDelete(hr._id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(hr)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Select
+                            value={hr.status}
+                            onValueChange={(val) =>
+                              handleStatusChange(hr._id, val as 'active' | 'on-leave' | 'inactive')
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-28 text-xs bg-secondary border-border">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="active">Active</SelectItem>
+                              <SelectItem value="on-leave">On Leave</SelectItem>
+                              <SelectItem value="inactive">Inactive</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </TableCell>
                   </TableRow>
                   ))
                 )}
