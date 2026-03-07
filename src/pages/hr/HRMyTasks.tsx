@@ -18,7 +18,6 @@ import TaskDetailDialog from '@/components/tasks/TaskDetailDialog';
 import TaskCreateDialog from '@/components/tasks/TaskCreateDialog';
 import TaskEditDialog from '@/components/tasks/TaskEditDialog';
 import TimeTracker from '@/components/tasks/TimeTracker';
-import { WorkflowDiagramButton } from '@/components/tasks/WorkflowDiagram';
 
 const HRMyTasks = () => {
   const { toast } = useToast();
@@ -99,7 +98,6 @@ const HRMyTasks = () => {
               <p className="text-muted-foreground">Tasks assigned to you — create and track your personal work</p>
             </div>
             <div className="flex items-center gap-2">
-              <WorkflowDiagramButton />
               <Button className="glow-button" onClick={() => setIsCreateOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />Create Task
               </Button>

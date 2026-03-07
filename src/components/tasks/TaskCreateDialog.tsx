@@ -91,7 +91,10 @@ const TaskCreateDialog = ({
       if (formData.startDate) payload.startDate = formData.startDate;
       if (formData.project) payload.project = formData.project;
       if (formData.milestone) payload.milestone = formData.milestone;
-      if (formData.estimatedTime) payload.estimatedTime = parseInt(formData.estimatedTime);
+      if (formData.estimatedTime) {
+        const et = parseFloat(formData.estimatedTime);
+        payload.estimatedTime = ['240', '480'].includes(formData.estimatedTime) ? et : Math.round(et * 60);
+      }
       if (formData.tags.length > 0) payload.tags = formData.tags;
 
       const createRes = await taskAPI.createTask(payload);
@@ -165,8 +168,25 @@ const TaskCreateDialog = ({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Estimated Time (minutes)</Label>
-              <Input type="number" placeholder="e.g. 120" value={formData.estimatedTime} onChange={(e) => setFormData({ ...formData, estimatedTime: e.target.value })} />
+              <Label>Estimated Time</Label>
+              <Select
+                value={formData.estimatedTime === '' ? 'custom' : (['240', '480'].includes(formData.estimatedTime) ? formData.estimatedTime : 'custom')}
+                onValueChange={(val) => {
+                  if (val === '240') setFormData({ ...formData, estimatedTime: '240' });
+                  else if (val === '480') setFormData({ ...formData, estimatedTime: '480' });
+                  else setFormData({ ...formData, estimatedTime: '' });
+                }}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="custom">Custom Hours</SelectItem>
+                  <SelectItem value="240">Before Lunch (~4h)</SelectItem>
+                  <SelectItem value="480">Evening of the Day (~8h)</SelectItem>
+                </SelectContent>
+              </Select>
+              {!['240', '480'].includes(formData.estimatedTime) && (
+                <Input type="number" placeholder="e.g. 2" min="0.5" step="0.5" value={formData.estimatedTime} onChange={(e) => setFormData({ ...formData, estimatedTime: e.target.value })} />
+              )}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">

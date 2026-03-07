@@ -53,7 +53,7 @@ const TaskEditDialog = ({ task, open, onClose, onSaved, employees = [], projects
         assignedTo: typeof task.assignedTo === 'object' ? task.assignedTo?._id : task.assignedTo || '',
         dueDate: task.dueDate ? toLocalDatetimeStr(task.dueDate) : '',
         startDate: task.startDate ? toLocalDatetimeStr(task.startDate) : '',
-        estimatedTime: task.estimatedTime?.toString() || '',
+        estimatedTime: task.estimatedTime ? ([240, 480].includes(task.estimatedTime) ? task.estimatedTime.toString() : (task.estimatedTime / 60).toString()) : '',
         tags: task.tags || [],
       });
       // Pre-populate workflow from task
@@ -82,7 +82,10 @@ const TaskEditDialog = ({ task, open, onClose, onSaved, employees = [], projects
       if (form.assignedTo) payload.assignedTo = form.assignedTo;
       if (form.dueDate) payload.dueDate = form.dueDate;
       if (form.startDate) payload.startDate = form.startDate;
-      if (form.estimatedTime) payload.estimatedTime = parseInt(form.estimatedTime);
+      if (form.estimatedTime) {
+        const et = parseFloat(form.estimatedTime);
+        payload.estimatedTime = ['240', '480'].includes(form.estimatedTime) ? et : Math.round(et * 60);
+      }
       await taskAPI.updateTask(task._id, payload);
       // Sync workflow changes
       try {
@@ -148,8 +151,25 @@ const TaskEditDialog = ({ task, open, onClose, onSaved, employees = [], projects
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Estimated Time (minutes)</Label>
-              <Input type="number" value={form.estimatedTime} onChange={e => setForm(p => ({ ...p, estimatedTime: e.target.value }))} placeholder="e.g. 120" />
+              <Label>Estimated Time</Label>
+              <Select
+                value={form.estimatedTime === '' ? 'custom' : (['240', '480'].includes(form.estimatedTime) ? form.estimatedTime : 'custom')}
+                onValueChange={(val) => {
+                  if (val === '240') setForm(p => ({ ...p, estimatedTime: '240' }));
+                  else if (val === '480') setForm(p => ({ ...p, estimatedTime: '480' }));
+                  else setForm(p => ({ ...p, estimatedTime: '' }));
+                }}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="custom">Custom Hours</SelectItem>
+                  <SelectItem value="240">Before Lunch (~4h)</SelectItem>
+                  <SelectItem value="480">Evening of the Day (~8h)</SelectItem>
+                </SelectContent>
+              </Select>
+              {!['240', '480'].includes(form.estimatedTime) && (
+                <Input type="number" value={form.estimatedTime} onChange={e => setForm(p => ({ ...p, estimatedTime: e.target.value }))} placeholder="e.g. 2" min="0.5" step="0.5" />
+              )}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">

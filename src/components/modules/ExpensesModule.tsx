@@ -42,6 +42,7 @@ interface Expense {
     url?: string;
     publicId?: string;
   };
+  reviewedBy?: { name: string; employeeId?: string };
 }
 
 interface ExpensesModuleProps {
@@ -478,7 +479,14 @@ const ExpensesModule = ({ role }: ExpensesModuleProps) => {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      {getStatusBadge(expense.status)}
+                      <div className="flex flex-col items-end gap-1">
+                        {getStatusBadge(expense.status)}
+                        {expense.reviewedBy?.name && expense.status !== 'pending' && (
+                          <span className="text-[10px] text-muted-foreground">
+                            {expense.status === 'approved' ? 'Approved' : 'Rejected'} by {expense.reviewedBy.name}
+                          </span>
+                        )}
+                      </div>
                       {canApprove && (
                         <div className="flex gap-2">
                           {expense.status === 'pending' && (
@@ -506,18 +514,18 @@ const ExpensesModule = ({ role }: ExpensesModuleProps) => {
                               >
                                 <XCircle className="h-4 w-4" />
                               </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-primary hover:text-primary/80 hover:bg-primary/10"
+                                onClick={() => openEditExpense(expense)}
+                                disabled={actionLoading}
+                                title="Edit"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
                             </>
                           )}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-primary hover:text-primary/80 hover:bg-primary/10"
-                            onClick={() => openEditExpense(expense)}
-                            disabled={actionLoading}
-                            title="Edit"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
                         </div>
                       )}
                     </div>

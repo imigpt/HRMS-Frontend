@@ -111,7 +111,6 @@ const hrNavItems: NavItem[] = [
     { title: 'Payroll', href: '/hr/payroll', icon: IndianRupee, module: 'payroll' },
     { title: 'My Salary', href: '/hr/salaries', icon: Wallet, module: 'payroll' },
   ]},
-  { title: 'Holidays', href: '/hr/holidays', icon: CalendarDays },
   { title: 'Settings', href: '/hr/settings', icon: Settings },
 ];
 

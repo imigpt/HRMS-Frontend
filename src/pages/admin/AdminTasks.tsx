@@ -23,7 +23,6 @@ import TaskEditDialog from '@/components/tasks/TaskEditDialog';
 import ProjectManagement from '@/components/tasks/ProjectManagement';
 import TaskAnalytics from '@/components/tasks/TaskAnalytics';
 import TimeTracker from '@/components/tasks/TimeTracker';
-import { WorkflowDiagramButton } from '@/components/tasks/WorkflowDiagram';
 import { getInitials } from '@/components/tasks/task-helpers';
 
 const AdminTasks = () => {
@@ -98,7 +97,6 @@ const AdminTasks = () => {
             <p className="text-muted-foreground">Enterprise task management — projects, tracking & analytics</p>
           </div>
           <div className="flex items-center gap-2">
-            <WorkflowDiagramButton />
             <Button className="glow-button" onClick={() => setIsCreateOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />Create Task
             </Button>

@@ -5,15 +5,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, Loader2, Sun, ClipboardList } from 'lucide-react';
 import { taskAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
+
+type EstimatedTimeType = 'custom' | 'before-lunch' | 'evening';
 
 interface BODTask {
   id: string;
   title: string;
   description: string;
   estimatedTime: string;
+  estimatedTimeType: EstimatedTimeType;
 }
 
 interface BODDialogProps {
@@ -26,12 +30,12 @@ const BODDialog = ({ open, onClose, onSubmit }: BODDialogProps) => {
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
   const [tasks, setTasks] = useState<BODTask[]>([
-    { id: crypto.randomUUID(), title: '', description: '', estimatedTime: '' },
+    { id: crypto.randomUUID(), title: '', description: '', estimatedTime: '', estimatedTimeType: 'custom' },
   ]);
 
   const addTaskRow = () => {
     if (tasks.length >= 10) return;
-    setTasks(prev => [...prev, { id: crypto.randomUUID(), title: '', description: '', estimatedTime: '' }]);
+    setTasks(prev => [...prev, { id: crypto.randomUUID(), title: '', description: '', estimatedTime: '', estimatedTimeType: 'custom' }]);
   };
 
   const removeTaskRow = (id: string) => {
@@ -44,7 +48,19 @@ const BODDialog = ({ open, onClose, onSubmit }: BODDialogProps) => {
   };
 
   const isTaskValid = (t: BODTask) =>
-    t.title.trim() !== '' && t.description.trim() !== '' && t.estimatedTime.trim() !== '';
+    t.title.trim() !== '' && t.description.trim() !== '' && getEstimatedMinutes(t) > 0;
+
+  const getEstimatedMinutes = (t: BODTask): number => {
+    switch (t.estimatedTimeType) {
+      case 'before-lunch':
+        return 240; // 4 hours
+      case 'evening':
+        return 480; // 8 hours
+      case 'custom':
+      default:
+        return t.estimatedTime ? Math.round(parseFloat(t.estimatedTime) * 60) : 0;
+    }
+  };
 
   const handleSubmit = async () => {
     const valid = tasks.filter(t => t.title.trim());
@@ -72,7 +88,7 @@ const BODDialog = ({ open, onClose, onSubmit }: BODDialogProps) => {
           taskAPI.createTask({
             title: t.title.trim(),
             description: t.description.trim() || undefined,
-            estimatedTime: t.estimatedTime ? parseInt(t.estimatedTime) : undefined,
+            estimatedTime: getEstimatedMinutes(t) || undefined,
             dueDate,
             isBODTask: true,
             bodDate,
@@ -81,7 +97,7 @@ const BODDialog = ({ open, onClose, onSubmit }: BODDialogProps) => {
       );
 
       toast({ title: 'Day planned!', description: `${valid.length} task(s) added for today` });
-      setTasks([{ id: crypto.randomUUID(), title: '', description: '', estimatedTime: '' }]);
+      setTasks([{ id: crypto.randomUUID(), title: '', description: '', estimatedTime: '', estimatedTimeType: 'custom' }]);
       onSubmit();
     } catch (err: any) {
       toast({
@@ -143,15 +159,33 @@ const BODDialog = ({ open, onClose, onSubmit }: BODDialogProps) => {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Estimated Time (minutes) *</Label>
-                  <Input
-                    type="number"
-                    placeholder="e.g. 60"
-                    min="1"
-                    value={task.estimatedTime}
-                    onChange={e => updateTask(task.id, 'estimatedTime', e.target.value)}
-                    className="h-9"
-                  />
+                  <Label className="text-xs">Estimated Time *</Label>
+                  <Select
+                    value={task.estimatedTimeType}
+                    onValueChange={(val: EstimatedTimeType) => {
+                      setTasks(prev => prev.map(t => (t.id === task.id ? { ...t, estimatedTimeType: val, estimatedTime: '' } : t)));
+                    }}
+                  >
+                    <SelectTrigger className="h-9 bg-secondary border-border">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="custom">Custom Hours</SelectItem>
+                      <SelectItem value="before-lunch">Before Lunch (~4h)</SelectItem>
+                      <SelectItem value="evening">Evening of the Day (~8h)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {task.estimatedTimeType === 'custom' && (
+                    <Input
+                      type="number"
+                      placeholder="e.g. 2"
+                      min="0.5"
+                      step="0.5"
+                      value={task.estimatedTime}
+                      onChange={e => updateTask(task.id, 'estimatedTime', e.target.value)}
+                      className="h-9 mt-1.5"
+                    />
+                  )}
                 </div>
               </div>
             </div>

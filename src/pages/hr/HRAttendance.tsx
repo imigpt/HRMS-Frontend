@@ -28,9 +28,17 @@ import {
   Camera,
   Image,
   X,
+  ShieldCheck,
+  ShieldX,
+  ShieldAlert,
+  UserX,
 } from 'lucide-react';
 import { attendanceAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { validateFaceFromDataUrl } from '@/utils/faceDetection';
+import BODDialog from '@/components/attendance/BODDialog';
+import EODDialog from '@/components/attendance/EODDialog';
 
 interface TodayAttendance {
   _id?: string;
@@ -38,12 +46,13 @@ interface TodayAttendance {
     time?: string;
     location?: { latitude: number; longitude: number; address?: string };
     photo?: { url: string; publicId: string; capturedAt: string };
+    similarityScore?: number | null;
   };
   checkOut?: {
     time?: string;
     location?: { latitude: number; longitude: number; address?: string };
   };
-  status: 'present' | 'absent' | 'late' | 'on-leave';
+  status: 'present' | 'absent' | 'late' | 'on-leave' | 'half-day';
   workHours?: number;
 }
 
@@ -66,6 +75,7 @@ interface DailyAttendance {
 const HRAttendance = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const today = new Date();
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
@@ -91,9 +101,33 @@ const HRAttendance = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   
+  // Selfie status
+  const [selfieStatus, setSelfieStatus] = useState<'not-captured' | 'validating' | 'captured' | 'failed'>('not-captured');
+  
   // Photo preview state
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [showPhotoPreview, setShowPhotoPreview] = useState(false);
+
+  // BOD / EOD dialog state
+  const [showBODDialog, setShowBODDialog] = useState(false);
+  const [showEODDialog, setShowEODDialog] = useState(false);
+  const [pendingCheckIn, setPendingCheckIn] = useState(false);
+
+  // Re-verification retake state
+  const [isReVerification, setIsReVerification] = useState(false);
+  const [reVerifLoading, setReVerifLoading] = useState(false);
+
+  // Face verification status
+  const [faceVerifStatus, setFaceVerifStatus] = useState<'idle' | 'pending' | 'verified' | 'failed'>('idle');
+  const faceVerifPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const faceVerifPollCountRef = useRef(0);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (faceVerifPollRef.current) clearInterval(faceVerifPollRef.current);
+    };
+  }, []);
 
   // Effect to attach stream to video when modal opens
   useEffect(() => {
@@ -111,16 +145,32 @@ const HRAttendance = () => {
   const fetchTodayAttendance = async () => {
     try {
       const response = await attendanceAPI.getToday();
-      setTodayAttendance(response.data.data);
+      const todayRec = response.data.data;
+      setTodayAttendance(todayRec);
+
+      // Restore face verification status
+      if (todayRec?.checkIn?.similarityScore !== undefined && todayRec.checkIn.similarityScore !== null) {
+        setFaceVerifStatus(todayRec.checkIn.similarityScore >= 55 ? 'verified' : 'failed');
+      }
+
+      // Merge into monthAttendance
+      if (todayRec && todayRec.date) {
+        const recDate = new Date(todayRec.date);
+        if (recDate.getFullYear() === selectedYear && recDate.getMonth() === selectedMonth) {
+          setMonthAttendance(prev => {
+            const filtered = prev.filter(r => {
+              if (!r || !r.date) return true;
+              const d = new Date(r.date);
+              return !(d.getFullYear() === recDate.getFullYear() && d.getMonth() === recDate.getMonth() && d.getDate() === recDate.getDate());
+            });
+            return [todayRec, ...filtered];
+          });
+        }
+      }
     } catch (error: any) {
       console.error('Failed to fetch today attendance:', error);
-      // If no attendance for today, that's okay - user hasn't checked in yet
       if (error.response?.status !== 404) {
-        toast({
-          title: 'Error',
-          description: error.response?.data?.message || 'Failed to load today\'s attendance',
-          variant: 'destructive',
-        });
+        toast({ title: 'Error', description: error.response?.data?.message || 'Failed to load today\'s attendance', variant: 'destructive' });
       }
     }
   };
@@ -172,6 +222,16 @@ const HRAttendance = () => {
 
   // Camera functions
   const startCamera = async () => {
+    // Guard: profile photo is required for face verification
+    if (!user?.profilePhoto?.url) {
+      toast({
+        title: 'Profile Photo Required',
+        description: 'You must upload a profile photo before checking in so your identity can be verified.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       // First show the modal so video element is in DOM
       setShowCamera(true);
@@ -208,45 +268,112 @@ const HRAttendance = () => {
       streamRef.current = null;
     }
     setShowCamera(false);
+    setIsReVerification(false);
   }, []);
 
-  const capturePhoto = () => {
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      
-      // Check if video is ready
-      if (video.videoWidth === 0 || video.videoHeight === 0) {
-        toast({
-          title: 'Camera Loading',
-          description: 'Please wait for camera to initialize...',
-          variant: 'default',
-        });
+  const capturePhoto = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    // Check if video is ready
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      toast({
+        title: 'Camera Loading',
+        description: 'Please wait for camera to initialize...',
+        variant: 'default',
+      });
+      return;
+    }
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Mirror horizontally so the captured image matches the mirrored preview
+    ctx.save();
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0);
+    ctx.restore();
+
+    const dataUrl = canvas.toDataURL('image/jpeg');
+
+    // Run client-side face detection before accepting the photo
+    setSelfieStatus('validating');
+    toast({ title: 'Validating', description: 'Checking for face in captured photo…' });
+
+    const faceResult = await validateFaceFromDataUrl(dataUrl);
+
+    if (!faceResult.valid) {
+      setSelfieStatus('failed');
+      toast({
+        title: 'Selfie Rejected',
+        description: faceResult.reason,
+        variant: 'destructive',
+      });
+      // Keep camera open so user can retake immediately
+      return;
+    }
+
+    // Valid face detected — accept photo
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+      const file = new File([blob], `checkin-${Date.now()}.jpg`, { type: 'image/jpeg' });
+
+      if (isReVerification) {
+        // Re-verification flow: submit to backend synchronously
+        stopCamera();
+        setIsReVerification(false);
+        setReVerifLoading(true);
+        setFaceVerifStatus('pending');
+        try {
+          const res = await attendanceAPI.resubmitSelfie(file);
+          const { matched, similarityScore, message } = res.data;
+          if (matched) {
+            setFaceVerifStatus('verified');
+            toast({ title: '✓ Face Verified', description: message });
+          } else {
+            setFaceVerifStatus('failed');
+            toast({ title: 'Face Verification Failed', description: message, variant: 'destructive' });
+          }
+        } catch (err: any) {
+          setFaceVerifStatus('failed');
+          toast({
+            title: 'Re-verification Failed',
+            description: err.response?.data?.message || 'Could not process selfie. Please try again.',
+            variant: 'destructive',
+          });
+        } finally {
+          setReVerifLoading(false);
+        }
         return;
       }
-      
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(video, 0, 0);
-        
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const file = new File([blob], `checkin-${Date.now()}.jpg`, { type: 'image/jpeg' });
-            setCapturedPhotoFile(file);
-            setCapturedPhoto(canvas.toDataURL('image/jpeg'));
-            stopCamera();
-          }
-        }, 'image/jpeg', 0.8);
-      }
-    }
+
+      // Normal check-in selfie flow
+      setCapturedPhotoFile(file);
+      setCapturedPhoto(dataUrl);
+      setSelfieStatus('captured');
+      stopCamera();
+      toast({
+        title: 'Selfie Captured',
+        description: 'Selfie uploaded successfully. You may now check in.',
+      });
+    }, 'image/jpeg', 0.8);
   };
 
   const retakePhoto = () => {
     setCapturedPhoto(null);
     setCapturedPhotoFile(null);
+    setSelfieStatus('not-captured');
+    startCamera();
+  };
+
+  const startReVerification = () => {
+    setIsReVerification(true);
     startCamera();
   };
 
@@ -279,16 +406,57 @@ const HRAttendance = () => {
       await attendanceAPI.checkIn(location, capturedPhotoFile || undefined);
       
       toast({
-        title: 'Success',
-        description: 'Checked in successfully!',
+        title: 'Checked In',
+        description: 'Check-in successful! Face verification is processing in the background.',
       });
       
       // Reset camera state
       setCapturedPhoto(null);
       setCapturedPhotoFile(null);
-      
-      await fetchTodayAttendance();
+      setSelfieStatus('not-captured');
+
+      // Fetch month first so full list is loaded, then merge today's record on top
       await fetchMonthAttendance();
+      await fetchTodayAttendance();
+
+      // Start polling for face verification result (async background job)
+      setFaceVerifStatus('pending');
+      if (faceVerifPollRef.current) clearInterval(faceVerifPollRef.current);
+      faceVerifPollCountRef.current = 0;
+      faceVerifPollRef.current = setInterval(async () => {
+        faceVerifPollCountRef.current += 1;
+        // Timeout after ~30 seconds (10 attempts × 3s)
+        if (faceVerifPollCountRef.current > 10) {
+          clearInterval(faceVerifPollRef.current!);
+          faceVerifPollRef.current = null;
+          return;
+        }
+        try {
+          const res = await attendanceAPI.getToday();
+          const rec = res.data.data;
+          if (rec?.checkIn?.similarityScore !== undefined && rec.checkIn.similarityScore !== null) {
+            clearInterval(faceVerifPollRef.current!);
+            faceVerifPollRef.current = null;
+            const score: number = rec.checkIn.similarityScore;
+            if (score >= 55) {
+              setFaceVerifStatus('verified');
+              toast({
+                title: '✓ Face Verified',
+                description: `Identity confirmed — ${score.toFixed(1)}% match with your profile photo.`,
+              });
+            } else {
+              setFaceVerifStatus('failed');
+              toast({
+                title: 'Face Verification Failed',
+                description: `Selfie did not match your profile photo (${score.toFixed(1)}% similarity). Contact HR if this is an error.`,
+                variant: 'destructive',
+              });
+            }
+          }
+        } catch {
+          // Silent — will retry on next interval
+        }
+      }, 3000);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -316,8 +484,9 @@ const HRAttendance = () => {
         title: 'Success',
         description: 'Checked out successfully!',
       });
-      await fetchTodayAttendance();
+      // Fetch month first so full list is loaded, then merge today's record on top
       await fetchMonthAttendance();
+      await fetchTodayAttendance();
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -335,6 +504,7 @@ const HRAttendance = () => {
     late: monthAttendance.filter(d => d.status === 'late').length,
     absent: monthAttendance.filter(d => d.status === 'absent').length,
     leave: monthAttendance.filter(d => d.status === 'on-leave').length,
+    halfday: monthAttendance.filter(d => d.status === 'half-day').length,
   };
   
   const months = [
@@ -400,6 +570,8 @@ const HRAttendance = () => {
         return 'bg-destructive/20 border-destructive/40 text-destructive';
       case 'on-leave':
         return 'bg-primary/20 border-primary/40 text-primary';
+      case 'half-day':
+        return 'bg-orange-500/20 border-orange-500/40 text-orange-400';
       default:
         return 'bg-muted border-border text-muted-foreground';
     }
@@ -415,6 +587,8 @@ const HRAttendance = () => {
         return <Badge className="status-rejected">Absent</Badge>;
       case 'on-leave':
         return <Badge className="status-in-progress">Leave</Badge>;
+      case 'half-day':
+        return <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/40">Half Day</Badge>;
       default:
         return <Badge variant="outline">-</Badge>;
     }
@@ -520,17 +694,74 @@ const HRAttendance = () => {
     const minutes = Math.round((workHours - hours) * 60);
     return `${hours}h ${minutes}m`;
   };
+
+  const downloadAttendanceCSV = () => {
+    if (!monthAttendance || monthAttendance.length === 0) {
+      toast({ title: 'No records', description: 'No attendance records to export' });
+      return;
+    }
+
+    const rows: Array<string[]> = [];
+    rows.push(['Date', 'Check In', 'Check Out', 'Status', 'Work Hours', 'Check-in Photo']);
+
+    monthAttendance.forEach((rec) => {
+      const date = rec.date ? new Date(rec.date).toLocaleDateString() : '';
+      const checkIn = rec.checkIn?.time ? new Date(rec.checkIn.time).toLocaleTimeString() : '';
+      const checkOut = rec.checkOut?.time ? new Date(rec.checkOut.time).toLocaleTimeString() : '';
+      const status = rec.status || '';
+      const workHours = rec.workHours ? formatDuration(rec.workHours) : '';
+      const photo = rec.checkIn?.photo?.url || '';
+      rows.push([date, checkIn, checkOut, status, workHours, photo]);
+    });
+
+    const csv = rows.map(r => r.map(c => `"${String(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `attendance-${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
   
   return (
     <DashboardLayout>
       <div className="space-y-6 fade-in">
+        {/* BOD Dialog — required before check-in */}
+        <BODDialog
+          open={showBODDialog}
+          onClose={() => {
+            setShowBODDialog(false);
+            setPendingCheckIn(false);
+          }}
+          onSubmit={() => {
+            setShowBODDialog(false);
+            if (pendingCheckIn) {
+              setPendingCheckIn(false);
+              handlePunchIn();
+            }
+          }}
+        />
+
+        {/* EOD Dialog — shown before check-out */}
+        <EODDialog
+          open={showEODDialog}
+          onClose={() => setShowEODDialog(false)}
+          onConfirm={() => {
+            setShowEODDialog(false);
+            handlePunchOut();
+          }}
+        />
+
         {/* Camera Modal */}
         <Dialog open={showCamera} onOpenChange={(open) => !open && stopCamera()}>
           <DialogContent className="glass-card max-w-md">
             <DialogHeader>
-              <DialogTitle>Capture Check-in Photo</DialogTitle>
+              <DialogTitle>Take Selfie for Check-in</DialogTitle>
               <DialogDescription>
-                Position yourself in the frame and click capture
+                Position your face clearly in the frame and click capture. Only one face should be visible.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -541,16 +772,23 @@ const HRAttendance = () => {
                   playsInline 
                   muted
                   className="w-full h-full object-cover"
+                  style={{ transform: 'scaleX(-1)' }}
                 />
               </div>
               <canvas ref={canvasRef} className="hidden" />
+              {selfieStatus === 'validating' && (
+                <div className="flex items-center justify-center gap-2 text-yellow-400 text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Detecting face…
+                </div>
+              )}
               <div className="flex justify-center gap-3">
                 <Button variant="outline" onClick={stopCamera}>
                   Cancel
                 </Button>
-                <Button className="glow-button" onClick={capturePhoto}>
+                <Button className="glow-button" onClick={capturePhoto} disabled={selfieStatus === 'validating'}>
                   <Camera className="h-4 w-4 mr-2" />
-                  Capture
+                  {selfieStatus === 'failed' ? 'Retry Capture' : 'Capture Selfie'}
                 </Button>
               </div>
             </div>
@@ -598,26 +836,113 @@ const HRAttendance = () => {
                       ? `Check in: ${formatTime(todayAttendance?.checkIn?.time)}${hasCheckedOut ? ` • Check out: ${formatTime(todayAttendance?.checkOut?.time)}` : ' • Today'}`
                       : capturedPhoto 
                         ? 'Photo captured! Click "Confirm Check In" to proceed'
-                        : 'Take a selfie photo to mark attendance'}
+                        : user?.profilePhoto?.url
+                          ? 'Take a selfie photo to mark attendance'
+                          : 'Upload a profile photo first to enable face verification check-in'}
                   </p>
                   {hasCheckedOut && todayAttendance?.workHours && (
                     <p className="text-xs text-muted-foreground mt-1">
                       Total: {formatDuration(todayAttendance.workHours)}
                     </p>
                   )}
+                  {/* Face verification status badge */}
+                  {hasCheckedIn && faceVerifStatus !== 'idle' && (
+                    <div className="mt-2">
+                      {faceVerifStatus === 'pending' && (
+                        <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/40 gap-1">
+                          <ShieldAlert className="h-3 w-3" />
+                          Face Verification Pending…
+                        </Badge>
+                      )}
+                      {faceVerifStatus === 'verified' && (
+                        <Badge className="bg-success/20 text-success border-success/40 gap-1">
+                          <ShieldCheck className="h-3 w-3" />
+                          Face Verified
+                        </Badge>
+                      )}
+                      {faceVerifStatus === 'failed' && (
+                        <div className="flex items-center gap-2 flex-wrap mt-1">
+                        <Badge className="bg-destructive/20 text-destructive border-destructive/40 gap-1">
+                          <ShieldX className="h-3 w-3" />
+                          Face Verification Failed
+                        </Badge>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-6 px-2 text-xs border-destructive/40 text-destructive hover:bg-destructive/10"
+                          onClick={startReVerification}
+                          disabled={reVerifLoading}
+                        >
+                          {reVerifLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Camera className="h-3 w-3 mr-1" />}
+                          Retake Selfie
+                        </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Selfie status label (pre-check-in) */}
+                  {!hasCheckedIn && (
+                    <div className="mt-2">
+                      {selfieStatus === 'not-captured' && (
+                        <Badge variant="outline" className="gap-1 text-muted-foreground">
+                          <Camera className="h-3 w-3" />
+                          Selfie: Not Captured
+                        </Badge>
+                      )}
+                      {selfieStatus === 'validating' && (
+                        <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/40 gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Selfie: Validating…
+                        </Badge>
+                      )}
+                      {selfieStatus === 'captured' && (
+                        <Badge className="bg-success/20 text-success border-success/40 gap-1">
+                          <CheckCircle className="h-3 w-3" />
+                          Selfie: Verified
+                        </Badge>
+                      )}
+                      {selfieStatus === 'failed' && (
+                        <Badge className="bg-destructive/20 text-destructive border-destructive/40 gap-1">
+                          <XCircle className="h-3 w-3" />
+                          Selfie: Failed
+                        </Badge>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex flex-wrap gap-3">
-                {/* Camera capture before check-in */}
-                {/* Camera capture - Required before check-in */}
-                {!hasCheckedIn && !capturedPhoto && (
-                  <Button className="glow-button" size="lg" onClick={startCamera}>
-                    <Camera className="h-4 w-4 mr-2" />
-                    Take Photo to Check In
+                {/* Upload profile photo prompt if missing */}
+                {!hasCheckedIn && !user?.profilePhoto?.url && (
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="border-warning text-warning hover:bg-warning/10"
+                    onClick={() => navigate('/hr/profile')}
+                  >
+                    <UserX className="h-4 w-4 mr-2" />
+                    Upload Profile Photo
                   </Button>
                 )}
-                
-                {/* Show captured photo preview */}
+
+                {/* Take Selfie button — shown when no photo captured yet */}
+                {!hasCheckedIn && !capturedPhoto && selfieStatus !== 'validating' && (
+                  <Button className="glow-button" size="lg" onClick={startCamera}>
+                    <Camera className="h-4 w-4 mr-2" />
+                    Take Selfie
+                  </Button>
+                )}
+
+                {/* Recapture Selfie — shown when face validation failed (camera still open) */}
+                {!hasCheckedIn && selfieStatus === 'failed' && showCamera && (
+                  <Button variant="outline" size="lg" onClick={capturePhoto}>
+                    <Camera className="h-4 w-4 mr-2" />
+                    Retry Capture
+                  </Button>
+                )}
+
+                {/* Show captured photo preview + recapture option */}
                 {capturedPhoto && !hasCheckedIn && (
                   <div className="flex items-center gap-2">
                     <div className="relative">
@@ -635,21 +960,26 @@ const HRAttendance = () => {
                         <X className="h-3 w-3" />
                       </Button>
                     </div>
-                    <span className="text-xs text-success">Photo ready</span>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs text-success">Selfie ready</span>
+                      <Button variant="ghost" size="sm" className="h-5 px-1 text-xs text-muted-foreground" onClick={retakePhoto}>
+                        Recapture Selfie
+                      </Button>
+                    </div>
                   </div>
                 )}
 
-                {/* Check In Button - Only shows after photo is captured */}
-                {!hasCheckedIn && capturedPhoto && (
+                {/* Check In Button - Only enabled after selfie is captured & validated */}
+                {!hasCheckedIn && (
                   <Button 
                     className="glow-button"
                     size="lg"
-                    onClick={handlePunchIn}
-                    disabled={punchingIn}
+                    onClick={() => { setPendingCheckIn(true); setShowBODDialog(true); }}
+                    disabled={punchingIn || selfieStatus !== 'captured'}
                   >
                     {punchingIn && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     <LogIn className="h-4 w-4 mr-2" />
-                    Confirm Check In
+                    Check In
                   </Button>
                 )}
 
@@ -658,7 +988,7 @@ const HRAttendance = () => {
                   <Button 
                     className="bg-destructive hover:bg-destructive/90"
                     size="lg"
-                    onClick={handlePunchOut}
+                    onClick={() => setShowEODDialog(true)}
                     disabled={punchingOut}
                   >
                     {punchingOut && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -667,7 +997,7 @@ const HRAttendance = () => {
                   </Button>
                 )}
                 
-                <Button variant="outline" size="lg" className="glass-card" onClick={() => navigate('/hr/leave')}>
+                <Button variant="outline" size="lg" className="glass-card" onClick={() => navigate('/hr/leaves')}>
                   <FileText className="h-4 w-4 mr-2" />
                   Apply Leave
                 </Button>
@@ -677,7 +1007,7 @@ const HRAttendance = () => {
         </Card>
 
         {/* Stats Overview */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card className="glass-card card-hover">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
@@ -726,6 +1056,19 @@ const HRAttendance = () => {
                 <div>
                   <p className="text-2xl font-bold text-foreground">{stats.leave}</p>
                   <p className="text-xs text-muted-foreground">Leave</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="glass-card card-hover">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center">
+                  <Clock className="h-5 w-5 text-orange-400" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-foreground">{stats.halfday}</p>
+                  <p className="text-xs text-muted-foreground">Half Day</p>
                 </div>
               </div>
             </CardContent>
@@ -782,6 +1125,10 @@ const HRAttendance = () => {
                 <Button variant="secondary" size="sm" onClick={handleToday}>
                   Today
                 </Button>
+                <Button variant="outline" size="sm" onClick={() => downloadAttendanceCSV()}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Export
+                </Button>
               </div>
             </div>
           </CardHeader>
@@ -825,6 +1172,7 @@ const HRAttendance = () => {
                           {attendance.status === 'late' && <AlertCircle className="h-2.5 w-2.5" />}
                           {attendance.status === 'absent' && <XCircle className="h-2.5 w-2.5" />}
                           {attendance.status === 'on-leave' && <CircleDot className="h-2.5 w-2.5" />}
+                          {attendance.status === 'half-day' && <CheckCircle className="h-2.5 w-2.5" />}
                         </div>
                       )}
                     </div>

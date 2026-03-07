@@ -26,7 +26,7 @@ const TaskListView = ({
   showAssignee = true,
   showProject = false,
 }: TaskListViewProps) => {
-  const colSpan = 7 + (showAssignee ? 1 : 0) + (showProject ? 1 : 0);
+  const colSpan = 8 + (showAssignee ? 1 : 0) + (showProject ? 1 : 0);
 
   return (
     <TooltipProvider>
@@ -39,6 +39,7 @@ const TaskListView = ({
             <TableHead className="font-semibold">Priority</TableHead>
             <TableHead className="font-semibold min-w-[130px]">Progress</TableHead>
             <TableHead className="font-semibold">Due Date</TableHead>
+            <TableHead className="font-semibold">Est. Time</TableHead>
             <TableHead className="font-semibold">Status</TableHead>
             <TableHead className="font-semibold text-center">Info</TableHead>
             <TableHead className="font-semibold text-right">Actions</TableHead>
@@ -170,6 +171,18 @@ const TaskListView = ({
                     </div>
                     {task.startDate && (
                       <p className="text-[10px] text-muted-foreground mt-0.5">Started {formatDate(task.startDate)}</p>
+                    )}
+                  </TableCell>
+
+                  {/* ── Est. Time ── */}
+                  <TableCell>
+                    {task.estimatedTime ? (
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Clock className="h-3.5 w-3.5" />
+                        <span>{formatDuration(task.estimatedTime)}</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
                     )}
                   </TableCell>
 

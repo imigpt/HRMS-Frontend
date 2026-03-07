@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Moon, CheckCircle2, Circle, AlertCircle, Loader } from 'lucide-react';
+import { Loader2, Moon, CheckCircle2, Circle, AlertCircle, Loader, Plus, Trash2 } from 'lucide-react';
 import { taskAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
 
@@ -31,11 +33,19 @@ const EOD_STATUS_OPTIONS = [
   { value: 'not-done', label: '⏸️ Not Done Today', color: 'text-muted-foreground' },
 ];
 
+interface NewEODTask {
+  id: string;
+  title: string;
+  description: string;
+}
+
 const EODDialog = ({ open, onClose, onConfirm }: EODDialogProps) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [eodTasks, setEodTasks] = useState<EODTask[]>([]);
+  const [newTasks, setNewTasks] = useState<NewEODTask[]>([]);
+  const [showAddTask, setShowAddTask] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -71,20 +81,23 @@ const EODDialog = ({ open, onClose, onConfirm }: EODDialogProps) => {
     setEodTasks(prev => prev.map(t => (t._id === id ? { ...t, [field]: value } : t)));
   };
 
+  const addNewTaskRow = () => {
+    setNewTasks(prev => [...prev, { id: crypto.randomUUID(), title: '', description: '' }]);
+    setShowAddTask(true);
+  };
+
+  const removeNewTask = (id: string) => {
+    setNewTasks(prev => prev.filter(t => t.id !== id));
+  };
+
+  const updateNewTask = (id: string, field: keyof NewEODTask, value: string) => {
+    setNewTasks(prev => prev.map(t => (t.id === id ? { ...t, [field]: value } : t)));
+  };
+
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
       // Update task statuses for tasks that changed
-      const updates = eodTasks.filter(t => {
-        const targetStatus =
-          t.eodStatus === 'completed'
-            ? 'completed'
-            : t.eodStatus === 'in-progress'
-            ? 'in-progress'
-            : t.status; // leave unchanged if not-done
-        return t.eodStatus !== 'not-done' || t.notes.trim();
-      });
-
       await Promise.allSettled(
         eodTasks
           .filter(t => t.eodStatus === 'completed' && t.status !== 'completed')
@@ -98,7 +111,33 @@ const EODDialog = ({ open, onClose, onConfirm }: EODDialogProps) => {
           .map(t => taskAPI.addComment(t._id, { content: `[EOD Note] ${t.notes.trim()}` }))
       );
 
+      // Create new tasks added during EOD
+      const validNewTasks = newTasks.filter(t => t.title.trim());
+      if (validNewTasks.length > 0) {
+        const today = new Date();
+        const bodDate = today.toISOString();
+        const endOfDay = new Date(today);
+        endOfDay.setHours(23, 59, 0, 0);
+        const dueDate = endOfDay.toISOString();
+
+        await Promise.allSettled(
+          validNewTasks.map(t =>
+            taskAPI.createTask({
+              title: t.title.trim(),
+              description: t.description.trim() || undefined,
+              dueDate,
+              isBODTask: true,
+              bodDate,
+              status: 'completed',
+              progress: 100,
+            })
+          )
+        );
+      }
+
       toast({ title: 'Day summary saved', description: 'Have a great evening!' });
+      setNewTasks([]);
+      setShowAddTask(false);
       onConfirm();
     } catch {
       // Non-blocking — proceed to checkout even if updates fail
@@ -153,7 +192,7 @@ const EODDialog = ({ open, onClose, onConfirm }: EODDialogProps) => {
                       <p className="text-sm font-medium truncate">{task.title}</p>
                       <Badge variant="outline" className="text-[10px]">{task.priority}</Badge>
                       {task.estimatedTime ? (
-                        <span className="text-[10px] text-muted-foreground">~{task.estimatedTime}m</span>
+                        <span className="text-[10px] text-muted-foreground">~{task.estimatedTime >= 60 ? `${(task.estimatedTime / 60).toFixed(1).replace(/\.0$/, '')}h` : `${task.estimatedTime}m`}</span>
                       ) : null}
                     </div>
                     <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -185,6 +224,43 @@ const EODDialog = ({ open, onClose, onConfirm }: EODDialogProps) => {
               </div>
             ))
           )}
+        </div>
+
+        {/* Add new tasks section */}
+        <div className="space-y-2 py-1">
+          {newTasks.map((task, idx) => (
+            <div key={task.id} className="space-y-2 p-3 rounded-xl bg-primary/5 border border-primary/20">
+              <div className="flex items-center justify-between">
+                <Badge className="bg-primary/20 text-primary border-primary/30 text-[10px]">New Task {idx + 1}</Badge>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeNewTask(task.id)}>
+                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                </Button>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Task Title *</Label>
+                <Input
+                  placeholder="What did you work on?"
+                  value={task.title}
+                  onChange={e => updateNewTask(task.id, 'title', e.target.value)}
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Description</Label>
+                <Textarea
+                  placeholder="Brief notes..."
+                  rows={2}
+                  value={task.description}
+                  onChange={e => updateNewTask(task.id, 'description', e.target.value)}
+                  className="resize-none text-xs"
+                />
+              </div>
+            </div>
+          ))}
+          <Button variant="outline" size="sm" className="w-full gap-2 text-xs" onClick={addNewTaskRow}>
+            <Plus className="h-3.5 w-3.5" />
+            Add Task Not in BOD
+          </Button>
         </div>
 
         {/* Summary bar */}
