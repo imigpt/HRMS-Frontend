@@ -409,6 +409,25 @@ export const payrollAPI = {
   deletePayroll: (id: string) => api.delete(`/payroll/${id}`),
 };
 
+// Notification APIs
+export const notificationsAPI = {
+  // FCM token management
+  saveToken: (data: { token: string; device?: string }) =>
+    api.post('/notifications/save-token', data),
+  removeToken: (data: { token: string }) =>
+    api.delete('/notifications/remove-token', { data }),
+
+  // Notification queries
+  getNotifications: (userId: string) => api.get(`/notifications/${userId}`),
+  getUnreadCount: (userId: string) => api.get(`/notifications/unread-count/${userId}`),
+  markAsRead: (id: string) => api.put(`/notifications/read/${id}`),
+  markAllAsRead: (userId: string) => api.put(`/notifications/read-all/${userId}`),
+
+  // Admin/HR: send push notification
+  send: (data: { userId: string; title: string; body: string; data?: Record<string, string> }) =>
+    api.post('/notifications/send', data),
+};
+
 // User APIs
 export const userAPI = {
   getUsers: (params?: any) => api.get('/user', { params }),
@@ -513,4 +532,5 @@ export default {
   policy: policyAPI,
   payroll: payrollAPI,
   settings: settingsAPI,
+  notifications: notificationsAPI,
 };

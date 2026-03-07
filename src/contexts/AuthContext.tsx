@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { authAPI } from '@/lib/apiClient';
 import { initSocket, disconnectSocket } from '@/lib/socket';
+import { useFCMToken } from '@/hooks/useFCMToken';
 import type { User } from '@/types/api';
 
 export type UserRole = 'admin' | 'hr' | 'employee' | 'client' | null;
@@ -21,6 +22,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // FCM token registration — deduplicates via localStorage guard
+  const { removeToken } = useFCMToken(user?._id ?? null);
 
   // Check if user is already logged in on mount
   useEffect(() => {
@@ -67,13 +71,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const logout = useCallback(() => {
+    removeToken(); // remove FCM token from server & localStorage before clearing state
     authAPI.logout().catch(() => {});
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
     setIsAuthenticated(false);
     disconnectSocket();
-  }, []);
+  }, [removeToken]);
 
   return (
     <AuthContext.Provider
