@@ -742,7 +742,7 @@ ${entries.map((e: any, i: number) => `
                       </p>
                     )}
                   </div>
-                  {(userRole === 'admin' || userRole === 'hr') && (
+                  {(userRole === 'admin' || userRole === 'hr' || userRole === 'employee') && (
                     <Button size="sm" variant="outline" onClick={() => setShowSubtaskForm(!showSubtaskForm)} className="gap-1.5">
                       <Plus className="h-3.5 w-3.5" />Add Subtask
                     </Button>
@@ -787,12 +787,12 @@ ${entries.map((e: any, i: number) => `
                         </Select>
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-xs">Start Date</Label>
-                        <Input type="date" className="h-9 text-xs" value={subtaskForm.startDate} onChange={e => setSubtaskForm(p => ({ ...p, startDate: e.target.value }))} />
+                        <Label className="text-xs">Start Date & Time</Label>
+                        <Input type="datetime-local" className="h-9 text-xs" value={subtaskForm.startDate} onChange={e => setSubtaskForm(p => ({ ...p, startDate: e.target.value }))} />
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-xs">Due Date</Label>
-                        <Input type="date" className="h-9 text-xs" value={subtaskForm.dueDate} onChange={e => setSubtaskForm(p => ({ ...p, dueDate: e.target.value }))} />
+                        <Label className="text-xs">Due Date & Time</Label>
+                        <Input type="datetime-local" className="h-9 text-xs" value={subtaskForm.dueDate} onChange={e => setSubtaskForm(p => ({ ...p, dueDate: e.target.value }))} />
                       </div>
                     </div>
                     <div className="flex gap-2 justify-end">

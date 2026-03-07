@@ -145,6 +145,15 @@ export const attendanceAPI = {
   // Half Day Request
   requestHalfDay: (data: { date: string; reason: string }) =>
     api.post('/attendance/half-day-request', data),
+
+  // Re-submit selfie for re-verification after a failed check-in face verification
+  resubmitSelfie: (photoFile: File) => {
+    const formData = new FormData();
+    formData.append('photo', photoFile);
+    return api.post<{ success: boolean; similarityScore: number; matched: boolean; message: string }>(
+      '/attendance/resend-selfie', formData
+    );
+  },
 };
 
 // Task APIs – Enterprise Task Management System

@@ -171,12 +171,12 @@ const TaskCreateDialog = ({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Start Date</Label>
-              <Input type="date" value={formData.startDate} onChange={(e) => setFormData({ ...formData, startDate: e.target.value })} />
+              <Label>Start Date & Time</Label>
+              <Input type="datetime-local" value={formData.startDate} onChange={(e) => setFormData({ ...formData, startDate: e.target.value })} />
             </div>
             <div className="space-y-2">
-              <Label>Due Date *</Label>
-              <Input type="date" value={formData.dueDate} onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} />
+              <Label>Due Date & Time *</Label>
+              <Input type="datetime-local" value={formData.dueDate} onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} />
             </div>
           </div>
           {projects.length > 0 && (

@@ -45,7 +45,7 @@ const EmployeeDashboard = () => {
   // ── New state for the extra sections ────────────────────────────────────────
   const [profileData, setProfileData] = useState<any>(null);
   const [attendanceStats, setAttendanceStats] = useState({
-    total: 0, present: 0, leaves: 0, halfDay: 0, late: 0,
+    total: 0, present: 0, leaves: 0, absent: 0, halfDay: 0, late: 0,
   });
   const [leaveStats, setLeaveStats] = useState({
     total: 0, approved: 0, rejected: 0, pending: 0, paidLeaves: 0, unpaidLeaves: 0,
@@ -95,7 +95,8 @@ const EmployeeDashboard = () => {
         const records: any[] = attRes?.data?.data || attRes?.data || [];
         const total    = records.length;
         const late     = records.filter((r: any) => r.status === 'late').length;
-        const leaves   = records.filter((r: any) => r.status === 'on-leave' || r.status === 'absent').length;
+        const leaves   = records.filter((r: any) => r.status === 'on-leave').length;
+        const absent   = records.filter((r: any) => r.status === 'absent').length;
         const halfDay  = records.filter((r: any) => r.status === 'half-day').length;
         const present  = records.filter((r: any) => r.status === 'present').length;
 
@@ -115,7 +116,7 @@ const EmployeeDashboard = () => {
           setWorkHours(prev => ({ ...prev, lateHrs, lateMins }));
         }
 
-        setAttendanceStats({ total, present, leaves, halfDay, late });
+        setAttendanceStats({ total, present, leaves, absent, halfDay, late });
       } catch { /* silent */ }
 
       // ── Leave stats ─────────────────────────────────────────────────────────
@@ -150,6 +151,9 @@ const EmployeeDashboard = () => {
 
   useEffect(() => {
     fetchDashboard();
+    // Poll dashboard every 15 seconds to keep attendance stats near real-time
+    const iv = setInterval(() => fetchDashboard(), 15000);
+    return () => clearInterval(iv);
   }, [fetchDashboard]);
 
   const handlePunch = async () => {
@@ -325,6 +329,7 @@ const EmployeeDashboard = () => {
                     { label: 'Total Attendance', value: attendanceStats.total,   color: '#a855f7' },
                     { label: 'Present',           value: attendanceStats.present, color: '#22c55e' },
                     { label: 'Leaves',            value: attendanceStats.leaves,  color: '#ef4444' },
+                    { label: 'Absent',            value: attendanceStats.absent,   color: '#ef6a6a' },
                     { label: 'Half Day',          value: attendanceStats.halfDay, color: '#3b82f6' },
                     { label: 'Late Attendance',   value: attendanceStats.late,    color: '#f97316' },
                   ].map(item => (
@@ -342,15 +347,16 @@ const EmployeeDashboard = () => {
                         data={[
                           { name: 'Present',   value: Math.max(attendanceStats.present, 0) },
                           { name: 'Leaves',    value: Math.max(attendanceStats.leaves, 0) },
+                          { name: 'Absent',    value: Math.max(attendanceStats.absent, 0) },
                           { name: 'Half Day',  value: Math.max(attendanceStats.halfDay, 0) },
                           { name: 'Late',      value: Math.max(attendanceStats.late, 0) },
-                        ].filter(d => d.value > 0)}
+                        ]}
                         cx="50%" cy="50%"
                         innerRadius={34} outerRadius={56}
                         dataKey="value"
                         strokeWidth={0}
                       >
-                        {['#22c55e', '#ef4444', '#3b82f6', '#f97316'].map((color, i) => (
+                        {['#22c55e', '#ef4444', '#ef6a6a', '#3b82f6', '#f97316'].map((color, i) => (
                           <Cell key={i} fill={color} />
                         ))}
                       </Pie>

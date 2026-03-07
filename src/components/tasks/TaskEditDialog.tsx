@@ -12,6 +12,12 @@ import { useToast } from '@/hooks/use-toast';
 import WorkflowPicker from './WorkflowPicker';
 import { Separator } from '@/components/ui/separator';
 
+const toLocalDatetimeStr = (dateStr: string) => {
+  const d = new Date(dateStr);
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 interface TaskEditDialogProps {
   task: any;
   open: boolean;
@@ -45,8 +51,8 @@ const TaskEditDialog = ({ task, open, onClose, onSaved, employees = [], projects
         description: task.description || '',
         priority: task.priority || 'medium',
         assignedTo: typeof task.assignedTo === 'object' ? task.assignedTo?._id : task.assignedTo || '',
-        dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
-        startDate: task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : '',
+        dueDate: task.dueDate ? toLocalDatetimeStr(task.dueDate) : '',
+        startDate: task.startDate ? toLocalDatetimeStr(task.startDate) : '',
         estimatedTime: task.estimatedTime?.toString() || '',
         tags: task.tags || [],
       });
@@ -148,12 +154,12 @@ const TaskEditDialog = ({ task, open, onClose, onSaved, employees = [], projects
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Start Date</Label>
-              <Input type="date" value={form.startDate} onChange={e => setForm(p => ({ ...p, startDate: e.target.value }))} />
+              <Label>Start Date & Time</Label>
+              <Input type="datetime-local" value={form.startDate} onChange={e => setForm(p => ({ ...p, startDate: e.target.value }))} />
             </div>
             <div className="space-y-2">
-              <Label>Due Date</Label>
-              <Input type="date" value={form.dueDate} onChange={e => setForm(p => ({ ...p, dueDate: e.target.value }))} />
+              <Label>Due Date & Time</Label>
+              <Input type="datetime-local" value={form.dueDate} onChange={e => setForm(p => ({ ...p, dueDate: e.target.value }))} />
             </div>
           </div>
           <div className="space-y-2">

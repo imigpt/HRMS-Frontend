@@ -18,7 +18,7 @@ import TaskDetailDialog from '@/components/tasks/TaskDetailDialog';
 import TaskCreateDialog from '@/components/tasks/TaskCreateDialog';
 import TaskEditDialog from '@/components/tasks/TaskEditDialog';
 import TimeTracker from '@/components/tasks/TimeTracker';
-import { WorkflowDiagramButton } from '@/components/tasks/WorkflowDiagram';
+// Workflow button removed from employee tasks per request
 
 const EmployeeTasks = () => {
   const { toast } = useToast();
@@ -83,7 +83,6 @@ const EmployeeTasks = () => {
             <p className="text-muted-foreground">Manage your tasks and track progress</p>
           </div>
           <div className="flex items-center gap-2">
-            <WorkflowDiagramButton />
             <Button className="glow-button" onClick={() => setIsCreateOpen(true)}><Plus className="h-4 w-4 mr-2" />Create Task</Button>
           </div>
         </div>

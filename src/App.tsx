@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import WorkflowBuilderPage from "./pages/WorkflowBuilderPage";
 
 // Pages
 import Login from "./pages/Login";
@@ -68,6 +69,13 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/workflow" element={<WorkflowRedirect />} />
+              {/* Workflow builder must come before the base workflow routes */}
+              <Route path="/admin/workflow/builder" element={<ProtectedRoute allowedRole="admin"><WorkflowBuilderPage /></ProtectedRoute>} />
+              <Route path="/admin/workflow/builder/:id" element={<ProtectedRoute allowedRole="admin"><WorkflowBuilderPage /></ProtectedRoute>} />
+              <Route path="/hr/workflow/builder" element={<ProtectedRoute allowedRole="hr"><WorkflowBuilderPage /></ProtectedRoute>} />
+              <Route path="/hr/workflow/builder/:id" element={<ProtectedRoute allowedRole="hr"><WorkflowBuilderPage /></ProtectedRoute>} />
+              <Route path="/employee/workflow/builder" element={<ProtectedRoute allowedRole="employee"><WorkflowBuilderPage /></ProtectedRoute>} />
+              <Route path="/employee/workflow/builder/:id" element={<ProtectedRoute allowedRole="employee"><WorkflowBuilderPage /></ProtectedRoute>} />
               <Route path="/admin/workflow" element={<ProtectedRoute allowedRole="admin"><WorkflowDiagramPage /></ProtectedRoute>} />
               <Route path="/hr/workflow" element={<ProtectedRoute allowedRole="hr"><WorkflowDiagramPage /></ProtectedRoute>} />
               <Route path="/employee/workflow" element={<ProtectedRoute allowedRole="employee"><WorkflowDiagramPage /></ProtectedRoute>} />

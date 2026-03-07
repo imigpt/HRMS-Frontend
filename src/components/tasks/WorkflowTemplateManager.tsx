@@ -5,6 +5,8 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -78,6 +80,8 @@ const WorkflowTemplateManager = ({
   selectLabel = 'Use Template',
 }: WorkflowTemplateManagerProps) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { userRole } = useAuth();
 
   // ── list state
   const [templates, setTemplates]   = useState<Template[]>([]);
@@ -114,24 +118,16 @@ const WorkflowTemplateManager = ({
     }
   }, [open, loadTemplates]);
 
-  // ─── open create form
+  // ─── open create form — navigates to full-page builder
   const openCreate = () => {
-    setEditing(null);
-    setFormName('');
-    setFormDesc('');
-    setFormShared(false);
-    setFormSteps([{ ...emptyStep() }]);
-    setPanel('create');
+    onClose();
+    navigate(`/${userRole}/workflow/builder`);
   };
 
-  // ─── open edit form
+  // ─── open edit form — navigates to full-page builder
   const openEdit = (tpl: Template) => {
-    setEditing(tpl);
-    setFormName(tpl.name);
-    setFormDesc(tpl.description);
-    setFormShared(tpl.isShared);
-    setFormSteps(tpl.steps.length ? [...tpl.steps] : [{ ...emptyStep() }]);
-    setPanel('edit');
+    onClose();
+    navigate(`/${userRole}/workflow/builder/${tpl._id}`);
   };
 
   // ─── step helpers

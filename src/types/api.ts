@@ -11,6 +11,7 @@ export interface User {
   position?: string;
   phone?: string;
   avatar?: string;
+  profilePhoto?: { url: string; publicId: string };
   companyName?: string; // For clients - their external company name
   clientNotes?: string; // Notes about the client
   status?: 'active' | 'inactive';
