@@ -180,8 +180,8 @@ const TaskCreateDialog = ({
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="custom">Custom Hours</SelectItem>
-                  <SelectItem value="240">Before Lunch (~4h)</SelectItem>
-                  <SelectItem value="480">Evening of the Day (~8h)</SelectItem>
+                  <SelectItem value="240">Before Lunch (4h)</SelectItem>
+                  <SelectItem value="480">End of the Day (8h)</SelectItem>
                 </SelectContent>
               </Select>
               {!['240', '480'].includes(formData.estimatedTime) && (

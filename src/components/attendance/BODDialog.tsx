@@ -10,7 +10,7 @@ import { Plus, Trash2, Loader2, Sun, ClipboardList } from 'lucide-react';
 import { taskAPI } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
 
-type EstimatedTimeType = 'custom' | 'before-lunch' | 'evening';
+type EstimatedTimeType = 'custom' | 'before-lunch' | 'end';
 
 interface BODTask {
   id: string;
@@ -54,7 +54,7 @@ const BODDialog = ({ open, onClose, onSubmit }: BODDialogProps) => {
     switch (t.estimatedTimeType) {
       case 'before-lunch':
         return 240; // 4 hours
-      case 'evening':
+      case 'end':
         return 480; // 8 hours
       case 'custom':
       default:
@@ -171,8 +171,8 @@ const BODDialog = ({ open, onClose, onSubmit }: BODDialogProps) => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="custom">Custom Hours</SelectItem>
-                      <SelectItem value="before-lunch">Before Lunch (~4h)</SelectItem>
-                      <SelectItem value="evening">Evening of the Day (~8h)</SelectItem>
+                      <SelectItem value="before-lunch">Before Lunch (4h)</SelectItem>
+                      <SelectItem value="end">End of the Day (8h)</SelectItem>
                     </SelectContent>
                   </Select>
                   {task.estimatedTimeType === 'custom' && (
