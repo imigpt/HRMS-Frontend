@@ -117,7 +117,7 @@ const AdminClients = () => {
       phone: client.phone || '',
       companyName: client.companyName || '',
       clientNotes: client.clientNotes || '',
-      address: '',
+      address: (client as any).address || '',
       company: (client as any).company?._id || (client as any).company || '',
     });
     setIsEditOpen(true);
